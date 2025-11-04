@@ -80,6 +80,11 @@ paths:
       summary: Removes a reaction (comment) from a message
       operationId: uncommentMessage
       responses:
+  /conversations/{conversationId}/messages/{messageId}:
+    delete:
+      summary: Deletes a sent message
+      operationId: deleteMessage
+      responses:
 
   
 

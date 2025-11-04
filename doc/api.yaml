@@ -99,6 +99,11 @@ paths:
       summary: Changes the group name
       operationId: setGroupName
       responses:
+   /groups/{groupId}/photo:
+    put:
+      summary: Updates the group photo
+      operationId: setGroupPhoto
+      responses:
 
   
 

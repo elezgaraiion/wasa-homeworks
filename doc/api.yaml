@@ -8,6 +8,114 @@ info:
   version: 1.0.0
 security:
   - BearerAuth: []
+components:
+  schemas:
+
+    User:
+      type: object
+      description: Represents an application user
+      properties:
+        id:
+          type: string
+          example: "user123"
+        name:
+          type: string
+          example: "Maria"
+        photo:
+          type: string
+          format: uri
+          example: "https://example.com/maria.jpg"
+
+    Conversation:
+      type: object
+      description: Represents a conversation, which can be a direct chat or a group
+      properties:
+        id:
+          type: string
+          example: "conv123"
+        type:
+          type: string
+          enum: [direct, group]
+          example: "group"
+        name:
+          type: string
+          example: "Amigos del trabajo"
+        photo:
+          type: string
+          format: uri
+          example: "https://example.com/group-photo.jpg"
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+
+    Message:
+      type: object
+      description: Represents a message sent in a conversation
+      properties:
+        id:
+          type: string
+          example: "msg001"
+        sender:
+          $ref: "#/components/schemas/User"
+        conversationId:
+          type: string
+          example: "conv123"
+        text:
+          type: string
+          example: "Hola 👋"
+        photo:
+          type: string
+          format: uri
+          example: "https://example.com/image.jpg"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2025-11-04T10:30:00Z"
+        forwardedFrom:
+          type: object
+          description: Information about the original message if this message was forwarded
+          properties:
+            conversationId:
+              type: string
+              example: "conv456"
+            messageId:
+              type: string
+              example: "msg999"
+
+    SendMessageRequest:
+      type: object
+      description: Request body for sending a new message
+      properties:
+        text:
+          type: string
+          example: "Buenos días ☀️"
+        photo:
+          type: string
+          format: uri
+          example: "https://example.com/photo.jpg"
+        forwardedFrom:
+          $ref: "#/components/schemas/Message/properties/forwardedFrom"
+
+    ForwardRequest:
+      type: object
+      description: Request body for forwarding an existing message
+      properties:
+        targetConversationId:
+          type: string
+          description: ID of the conversation to forward the message to
+          example: "conv789"
+
+    Reaction:
+      type: object
+      description: Represents a reaction (emoji) on a message
+      properties:
+        userId:
+          type: string
+          example: "user123"
+        emoji:
+          type: string
+          example: "❤️"
 
 paths:
   /session:
@@ -70,10 +178,10 @@ paths:
     post:
       summary: Sends a new message
       operationId: sendMessage
-      responses:    
-  /conversations/{conversationId}/messages/{messageId}/comments:
+      responses:
+  /conversations/{conversationId}/messages/{messageId}/reactions: 
     post:
-      summary: Forwards an existing message
+      summary: Adds a reaction (comment) on a existing message
       operationId: commentMessage
       responses:
     delete:

@@ -90,6 +90,10 @@ paths:
       summary: Adds a user to the group
       operationId: addToGroup
       responses:
+    delete:
+      summary: Leaves the group
+      operationId: leaveGroup
+      responses:
 
   
 

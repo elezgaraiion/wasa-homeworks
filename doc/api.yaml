@@ -74,7 +74,7 @@ paths:
   /conversations/{conversationId}/messages/{messageId}/comments:
     post:
       summary: Forwards an existing message
-      operationId: forwardMessage
+      operationId: commentMessage
       responses:
     delete:
       summary: Removes a reaction (comment) from a message

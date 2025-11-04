@@ -51,4 +51,9 @@ paths:
       summary: Updates the current user's name
       operationId: setMyUserName
       responses:
+  /me/photo:
+    post:
+      summary: Updates the current user's profile photo
+      operationId: setMyPhoto
+      responses:
 

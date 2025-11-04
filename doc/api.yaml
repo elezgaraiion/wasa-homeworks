@@ -94,6 +94,11 @@ paths:
       summary: Leaves the group
       operationId: leaveGroup
       responses:
+  /groups/{groupId}/name:
+    put:
+      summary: Changes the group name
+      operationId: setGroupName
+      responses:
 
   
 

@@ -47,13 +47,18 @@ paths:
                     type: string
                     example: "abcdef012345"
   /me/username:
-    post:
+    put:
       summary: Updates the current user's name
       operationId: setMyUserName
       responses:
   /me/photo:
-    post:
+    put:
       summary: Updates the current user's profile photo
       operationId: setMyPhoto
+      responses:
+  /conversations:
+    get:
+      summary: Retrieves all conversations of the user
+      operationId: getMyConversations
       responses:
 

@@ -61,4 +61,9 @@ paths:
       summary: Retrieves all conversations of the user
       operationId: getMyConversations
       responses:
+  /conversations/{conversationId}:
+    get:
+      summary: Retrieves a specific conversation
+      operationId: getConversation
+      responses:
 

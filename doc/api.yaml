@@ -46,3 +46,9 @@ paths:
                     # or any other type of identifier
                     type: string
                     example: "abcdef012345"
+  /me/username:
+    post:
+      summary: Updates the current user's name
+      operationId: setMyUserName
+      responses:
+

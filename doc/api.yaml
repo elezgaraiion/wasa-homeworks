@@ -71,6 +71,11 @@ paths:
       summary: Sends a new message
       operationId: sendMessage
       responses:
+  /conversations/{conversationId}/messages/{messageId}:
+    post:
+      summary: Forwards one of my messages to another conversation
+      operationId: forwardMessage
+      responses:
   /conversations/{conversationId}/messages/{messageId}/comments:
     post:
       summary: Forwards an existing message

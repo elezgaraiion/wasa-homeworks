@@ -66,4 +66,9 @@ paths:
       summary: Retrieves a specific conversation
       operationId: getConversation
       responses:
+  /conversations/{conversationId}/messages:
+    post:
+      summary: Sends a new message
+      operationId: sendMessage
+      responses:
 

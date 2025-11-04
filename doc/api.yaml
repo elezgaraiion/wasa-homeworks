@@ -76,5 +76,10 @@ paths:
       summary: Forwards an existing message
       operationId: forwardMessage
       responses:
+    delete:
+      summary: Removes a reaction (comment) from a message
+      operationId: uncommentMessage
+      responses:
+
   
 

@@ -8,6 +8,7 @@ info:
   version: 1.0.0
 security:
   - BearerAuth: []
+
 components:
   schemas:
 
@@ -120,15 +121,15 @@ components:
 paths:
   /session:
     post:
-      tags: ["login"]
-      summary: Logs in the user
-      description: |-
-        If the user does not exist, it will be created,
-        and an identifier is returned.
-        If the user exists, the user identifier is returned.
+      summary: Logs in or registers the user
+      description: >
+        Simplified login:  
+        If the username exists, the user is logged in.  
+        If not, a new user is created and logged in.  
+        Usernames must contain only letters (no digits or symbols) and be 3–16 characters long.
       operationId: doLogin
       requestBody:
-        description: User details
+        required: true
         content:
           application/json:
             schema:
@@ -137,28 +138,62 @@ paths:
                 name:
                   type: string
                   example: Maria
-                  pattern: 'ˆ.*?$'
+                  pattern: '^[A-Za-zÀ-ÿ]{3,16}$'
                   minLength: 3
                   maxLength: 16
-        required: true
       responses:
         '201':
-          description: User log-in action successful
+          description: User logged in or created successfully
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   identifier:
-                    # change here if you decide to use an integer
-                    # or any other type of identifier
                     type: string
                     example: "abcdef012345"
+        '400':
+          description: Invalid username format
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Username must be 3–16 letters, without numbers or symbols."
+        '409':
+          description: Username already in use
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "This username is already taken."
   /me/username:
     put:
       summary: Updates the current user's name
+      description: Changes the name of the authenticated user.
       operationId: setMyUserName
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "María López"
       responses:
+        '200':
+          description: Username updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
   /me/photo:
     put:
       summary: Updates the current user's profile photo

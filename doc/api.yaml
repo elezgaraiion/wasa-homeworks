@@ -85,6 +85,11 @@ paths:
       summary: Deletes a sent message
       operationId: deleteMessage
       responses:
+  /groups/{groupId}/users:
+    post:
+      summary: Adds a user to the group
+      operationId: addToGroup
+      responses:
 
   
 

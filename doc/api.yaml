@@ -29,7 +29,7 @@ components:
 
     Conversation:
       type: object
-      description: Represents a conversation, which can be a direct chat or a group
+      description: Represents a conversation (direct or group)
       properties:
         id:
           type: string
@@ -45,6 +45,13 @@ components:
           type: string
           format: uri
           example: "https://example.com/group-photo.jpg"
+        lastMessagePreview:
+          type: string
+          example: "¿Nos vemos mañana?"
+        lastMessageAt:
+          type: string
+          format: date-time
+          example: "2025-11-04T20:00:00Z"
         participants:
           type: array
           items:
@@ -84,40 +91,6 @@ components:
               type: string
               example: "msg999"
 
-    SendMessageRequest:
-      type: object
-      description: Request body for sending a new message
-      properties:
-        text:
-          type: string
-          example: "Buenos días ☀️"
-        photo:
-          type: string
-          format: uri
-          example: "https://example.com/photo.jpg"
-        forwardedFrom:
-          $ref: "#/components/schemas/Message/properties/forwardedFrom"
-
-    ForwardRequest:
-      type: object
-      description: Request body for forwarding an existing message
-      properties:
-        targetConversationId:
-          type: string
-          description: ID of the conversation to forward the message to
-          example: "conv789"
-
-    Reaction:
-      type: object
-      description: Represents a reaction (emoji) on a message
-      properties:
-        userId:
-          type: string
-          example: "user123"
-        emoji:
-          type: string
-          example: "❤️"
-
 paths:
   /session:
     post:
@@ -137,7 +110,7 @@ paths:
               properties:
                 name:
                   type: string
-                  example: Maria
+                  example: "Maria"
                   pattern: '^[A-Za-zÀ-ÿ]{3,16}$'
                   minLength: 3
                   maxLength: 16
@@ -172,10 +145,13 @@ paths:
                   error:
                     type: string
                     example: "This username is already taken."
+
   /me/username:
     put:
       summary: Updates the current user's name
-      description: Changes the name of the authenticated user.
+      description: >
+        Changes the name of the authenticated user.  
+        The new name must be unique, only contain letters, and have 3–16 characters.
       operationId: setMyUserName
       requestBody:
         required: true
@@ -187,6 +163,9 @@ paths:
                 name:
                   type: string
                   example: "María López"
+                  pattern: '^[A-Za-zÀ-ÿ]{3,16}$'
+                  minLength: 3
+                  maxLength: 16
       responses:
         '200':
           description: Username updated successfully
@@ -194,6 +173,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid name format
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Name must be 3–16 letters and cannot include symbols or digits."
+        '401':
+          description: Unauthorized – authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Missing or invalid token."
+        '409':
+          description: Conflict – name already in use
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "This name is already taken."
   /me/photo:
     put:
       summary: Updates the current user's profile photo

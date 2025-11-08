@@ -209,25 +209,25 @@ paths:
       operationId: setMyPhoto
       responses:
   /users:
-  get:
-    summary: List all users or search by name
-    operationId: listUsers
-    parameters:
-      - name: q
-        in: query
-        description: Optional search string
-        required: false
-        schema:
-          type: string
-    responses:
-      '200':
-        description: List of users
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                $ref: "#/components/schemas/User"
+    get:
+      summary: List all users or search by name
+      operationId: listUsers
+      parameters:
+        - name: q
+          in: query
+          description: Optional search string
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
   /conversations:
     get:
       summary: Retrieves all conversations of the user
@@ -261,6 +261,32 @@ paths:
       summary: Deletes a sent message
       operationId: deleteMessage
       responses:
+  /groups:
+    post:
+      summary: Creates a new group
+      operationId: createGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Amigos del trabajo"
+                users:
+                  type: array
+                  items:
+                    type: string
+                  example: ["user123", "user456"]
+      responses:
+        '201':
+          description: Group created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
   /groups/{groupId}/users:
     post:
       summary: Adds a user to the group

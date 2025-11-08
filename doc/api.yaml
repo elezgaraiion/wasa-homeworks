@@ -90,7 +90,18 @@ components:
             messageId:
               type: string
               example: "msg999"
-
+    Reaction:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        emoji:
+          type: string
+          example: "😂"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2025-11-08T15:00:00Z"
 paths:
   /session:
     post:

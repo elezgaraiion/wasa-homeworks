@@ -334,6 +334,7 @@ paths:
                   error:
                     type: string
                     example: "Unsupported image format. Allowed types: JPG, PNG, GIF."
+
   /users:
     get:
       summary: List all users or search by name
@@ -379,6 +380,7 @@ paths:
                   error:
                     type: string
                     example: "Missing or invalid token."
+
   /conversations:
     get:
       summary: Retrieves all conversations of the user
@@ -405,6 +407,7 @@ paths:
                   error:
                     type: string
                     example: "Missing or invalid token."
+
   /conversations/{conversationId}:
     get:
       summary: Retrieves a specific conversation
@@ -451,6 +454,7 @@ paths:
                   error:
                     type: string
                     example: "Conversation not found."
+
   /conversations/{conversationId}/messages:
     parameters:
       - $ref: "#/components/parameters/ConversationIdParam"
@@ -583,15 +587,223 @@ paths:
                 properties:
                   error:
                     type: string
+
   /conversations/{conversationId}/messages/{messageId}:
+    parameters:
+      - $ref: "#/components/parameters/ConversationIdParam"
+      - $ref: "#/components/parameters/MessageIdParam"
     post:
       summary: Forwards one of my messages to another conversation
+      description: >
+        Forward a message to another conversation. The body must contain `targetConversationId`.
+        Only the sender of the original message may forward it (business rule — enforced server-side).
       operationId: forwardMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetConversationId:
+                  type: string
+                  example: "conv456"
+              required:
+                - targetConversationId
       responses:
+        '201':
+          description: Message forwarded successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '403':
+          description: Forbidden – not allowed to forward or not a participant in target
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Conversation or message not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
     delete:
       summary: Deletes a sent message
+      description: >
+        Deletes a message that the authenticated user sent. Depending on backend retention policy, the message may be deleted for everyone or only hidden. Only the sender may delete their message.
       operationId: deleteMessage
       responses:
+        '204':
+          description: Message deleted successfully (no content)
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '403':
+          description: Forbidden – not the sender or insufficient permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Message or conversation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /conversations/{conversationId}/messages/{messageId}/reactions:
+    parameters:
+      - $ref: "#/components/parameters/ConversationIdParam"
+      - $ref: "#/components/parameters/MessageIdParam"
+    post:
+      summary: Adds a reaction (comment) on an existing message
+      description: >
+        Adds a reaction (emoji) to a message. Returns the created Reaction object (with id).
+      operationId: commentMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                emoji:
+                  type: string
+                  example: "👍"
+              required:
+                - emoji
+      responses:
+        '201':
+          description: Reaction added successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reaction"
+        '400':
+          description: Bad request – invalid emoji
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '403':
+          description: Forbidden – not a participant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Message or conversation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /conversations/{conversationId}/messages/{messageId}/reactions/{reactionId}:
+    parameters:
+      - $ref: "#/components/parameters/ConversationIdParam"
+      - $ref: "#/components/parameters/MessageIdParam"
+      - $ref: "#/components/parameters/ReactionIdParam"
+    delete:
+      summary: Removes a reaction (comment) from a message
+      description: >
+        Removes the specified reaction. Users may remove their own reactions; admins may remove any.
+      operationId: uncommentMessage
+      responses:
+        '204':
+          description: Reaction removed successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '403':
+          description: Forbidden – not allowed to remove this reaction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Reaction, message, or conversation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
   /groups:
     post:
       summary: Creates a new group
@@ -611,6 +823,8 @@ paths:
                   items:
                     type: string
                   example: ["user123", "user456"]
+              required:
+                - name
       responses:
         '201':
           description: Group created successfully
@@ -618,25 +832,232 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Conversation"
+        '400':
+          description: Bad request – invalid payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
   /groups/{groupId}/users:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
     post:
       summary: Adds a user to the group
       operationId: addToGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  example: "user789"
+              required:
+                - userId
       responses:
+        '200':
+          description: User added to group successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '403':
+          description: Forbidden – only group members may add users (or others depending on policy)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Group or user not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
     delete:
       summary: Leaves the group
       operationId: leaveGroup
+      description: >
+        Authenticated user will be removed from the group participants. If they are the last participant, backend may delete group.
       responses:
+        '204':
+          description: Left group successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
   /groups/{groupId}/name:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
     put:
       summary: Changes the group name
       operationId: setGroupName
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Nuevo nombre del grupo"
+              required:
+                - name
       responses:
+        '200':
+          description: Group name changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '403':
+          description: Forbidden – only group members can change name (or only admins depending on policy)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
   /groups/{groupId}/photo:
+    parameters:
+      - $ref: "#/components/parameters/GroupIdParam"
     put:
       summary: Updates the group photo
       operationId: setGroupPhoto
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
       responses:
-
-  
-
+        '200':
+          description: Group photo updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        '400':
+          description: Bad request – missing or invalid file
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '403':
+          description: Forbidden – only group members can update (or restricted)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '415':
+          description: Unsupported media type – only images allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string

@@ -6,6 +6,7 @@ info:
     individual or group messages with support for text, photos, and reactions.  
     Includes simplified login, user management, conversations, messages, and group handling.
   version: 1.0.0
+
 security:
   - bearerAuth: []
 
@@ -17,7 +18,18 @@ components:
       scheme: bearer
       bearerFormat: "user-id"
 
+  #-----------------------------------------------
+  # Shared Schemas
+  #-----------------------------------------------
+
   schemas:
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "An error occurred."
 
     User:
       type: object
@@ -33,9 +45,7 @@ components:
           type: string
           format: uri
           example: "https://example.com/maria.jpg"
-      required:
-        - id
-        - name
+      required: [id, name]
 
     Conversation:
       type: object
@@ -50,14 +60,14 @@ components:
           example: "group"
         name:
           type: string
-          example: "Amigos del trabajo"
+          example: "Work Friends"
         photo:
           type: string
           format: uri
           example: "https://example.com/group-photo.jpg"
         lastMessagePreview:
           type: string
-          example: "¿Nos vemos mañana?"
+          example: "See you tomorrow?"
         lastMessageAt:
           type: string
           format: date-time
@@ -66,10 +76,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/User"
-      required:
-        - id
-        - type
-        - participants
+      required: [id, type, participants]
 
     Reaction:
       type: object
@@ -86,11 +93,7 @@ components:
           type: string
           format: date-time
           example: "2025-11-08T15:00:00Z"
-      required:
-        - id
-        - user
-        - emoji
-        - createdAt
+      required: [id, user, emoji, createdAt]
 
     Message:
       type: object
@@ -106,7 +109,7 @@ components:
           example: "conv123"
         text:
           type: string
-          example: "Hola 👋"
+          example: "Hello 👋"
         photo:
           type: string
           format: uri
@@ -114,7 +117,6 @@ components:
         replyToMessageId:
           type: string
           example: "msg000"
-          description: "If present, this message is a reply to another message"
         createdAt:
           type: string
           format: date-time
@@ -129,59 +131,105 @@ components:
           example: "read"
           description: >
             Message status:
-            - delivered: received by all recipients (appears in their conversation list)
-            - read: read by all recipients within the conversation
-      required:
-        - id
-        - sender
-        - conversationId
-        - createdAt
-        - status
+            - delivered: received by all recipients
+            - read: read by all recipients
+      required: [id, sender, conversationId, createdAt, status]
+
+  #-----------------------------------------------
+  # Shared Parameters
+  #-----------------------------------------------
 
   parameters:
-    ConversationIdParam:
+    ConversationId:
       name: conversationId
       in: path
       required: true
-      description: Unique identifier of the conversation
+      description: Conversation ID
       schema:
         type: string
         example: "conv123"
-    MessageIdParam:
+
+    MessageId:
       name: messageId
       in: path
       required: true
-      description: Unique identifier of the message
+      description: Message ID
       schema:
         type: string
         example: "msg001"
-    GroupIdParam:
+
+    GroupId:
       name: groupId
       in: path
       required: true
-      description: Unique identifier of the group (conversation of type group)
+      description: Group ID
       schema:
         type: string
         example: "group123"
-    ReactionIdParam:
+
+    ReactionId:
       name: reactionId
       in: path
       required: true
-      description: Unique identifier of the reaction
+      description: Reaction ID
       schema:
         type: string
         example: "react789"
+
+  #-----------------------------------------------
+  # Shared Error Responses
+  #-----------------------------------------------
+
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+#-----------------------------------------------
+# Paths
+#-----------------------------------------------
+
 paths:
+
   /session:
     post:
-      summary: Logs in or registers the user
+      summary: Log in or register
       security: []
       description: >
         Simplified login:  
         If the username exists, the user is logged in.  
-        If not, a new user is created and logged in.  
-        Usernames must contain only letters (no digits or symbols) and be 3–16 characters long.
-      operationId: doLogin
+        If not, a new user is created and logged in.
       requestBody:
         required: true
         content:
@@ -193,13 +241,10 @@ paths:
                   type: string
                   example: "Maria"
                   pattern: '^[A-Za-zÀ-ÿ]{3,16}$'
-                  minLength: 3
-                  maxLength: 16
-              required:
-                - name
+              required: [name]
       responses:
         '201':
-          description: User logged in or created successfully
+          description: User logged in or created
           content:
             application/json:
               schema:
@@ -209,23 +254,12 @@ paths:
                     type: string
                     example: "abcdef012345"
         '400':
-          description: Invalid username format
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Username must be 3–16 letters, without numbers or symbols."
+          $ref: "#/components/responses/BadRequest"
 
   /me/username:
     put:
-      summary: Updates the current user's name
-      description: >
-        Changes the name of the authenticated user.  
-        The new name must be unique, contain only letters and spaces (accents allowed), and have 3–32 characters.
-      operationId: setMyUserName
+      summary: Update user name
+      description: Change authenticated user's name
       requestBody:
         required: true
         content:
@@ -235,57 +269,26 @@ paths:
               properties:
                 name:
                   type: string
-                  example: "María López"
-                  pattern: '^[A-Za-zÀ-ÿ ]{3,32}$'
-                  minLength: 3
-                  maxLength: 32
-              required:
-                - name
+                  example: "Maria Lopez"
+              required: [name]
       responses:
         '200':
-          description: Username updated successfully
+          description: Username updated
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
         '400':
-          description: Invalid name format
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Name must be 3–32 letters (spaces allowed) and cannot include digits or symbols."
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized – authentication required
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Missing or invalid token."
+          $ref: "#/components/responses/Unauthorized"
         '409':
-          description: Conflict – name already in use
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "This name is already taken."
+          $ref: "#/components/responses/Conflict"
 
   /me/photo:
     put:
-      summary: Updates the current user's profile photo
-      description: >
-        Uploads and sets a new profile photo for the authenticated user.  
-        The request must include a valid image file (e.g., JPEG, PNG, or GIF).
-      operationId: setMyPhoto
+      summary: Update profile photo
+      description: Upload and set a new profile photo
       requestBody:
         required: true
         content:
@@ -296,56 +299,31 @@ paths:
                 photo:
                   type: string
                   format: binary
-                  description: The new profile image file.
       responses:
         '200':
-          description: Photo updated successfully
+          description: Photo updated
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
         '400':
-          description: Bad request – missing or invalid file
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Missing photo file."
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized – authentication required
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Missing or invalid token."
+          $ref: "#/components/responses/Unauthorized"
         '415':
-          description: Unsupported media type – only images allowed
+          description: Unsupported media type
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Unsupported image format. Allowed types: JPG, PNG, GIF."
+                $ref: "#/components/schemas/ErrorResponse"
 
   /users:
     get:
-      summary: List all users or search by name
-      description: >
-        Retrieves all registered users, or filters them by name using the optional query parameter `q`.  
-        Returns an empty list if no users match.
-      operationId: listUsers
+      summary: List or search users
       parameters:
         - name: q
           in: query
-          description: Optional search string (letters and spaces)
+          description: Optional search string
           required: false
           schema:
             type: string
@@ -353,7 +331,7 @@ paths:
             example: "Maria"
       responses:
         '200':
-          description: List of users retrieved successfully
+          description: List of users
           content:
             application/json:
               schema:
@@ -361,36 +339,16 @@ paths:
                 items:
                   $ref: "#/components/schemas/User"
         '400':
-          description: Invalid search parameter
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Invalid search query. Only letters and spaces are allowed."
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized – authentication required
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Missing or invalid token."
+          $ref: "#/components/responses/Unauthorized"
 
   /conversations:
     get:
-      summary: Retrieves all conversations of the user
-      description: >
-        Returns all conversations (direct or group) for the authenticated user,  
-        sorted by the date of the last message in reverse chronological order.
-      operationId: getMyConversations
+      summary: List user conversations
       responses:
         '200':
-          description: List of conversations retrieved successfully
+          description: List of conversations
           content:
             application/json:
               schema:
@@ -398,77 +356,36 @@ paths:
                 items:
                   $ref: "#/components/schemas/Conversation"
         '401':
-          description: Unauthorized – authentication required
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Missing or invalid token."
+          $ref: "#/components/responses/Unauthorized"
 
   /conversations/{conversationId}:
     get:
-      summary: Retrieves a specific conversation
-      description: >
-        Returns the details of a specific conversation, including participants and the latest message preview.  
-        The user must be a participant of the conversation to access it.
-      operationId: getConversation
+      summary: Get a specific conversation
       parameters:
-        - $ref: "#/components/parameters/ConversationIdParam"
+        - $ref: "#/components/parameters/ConversationId"
       responses:
         '200':
-          description: Conversation retrieved successfully
+          description: Conversation details
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Conversation"
         '401':
-          description: Unauthorized – authentication required
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Missing or invalid token."
+          $ref: "#/components/responses/Unauthorized"
         '403':
-          description: Forbidden – user is not a participant in the conversation
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Access denied. You are not a participant in this conversation."
+          $ref: "#/components/responses/Forbidden"
         '404':
-          description: Conversation not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Conversation not found."
+          $ref: "#/components/responses/NotFound"
 
   /conversations/{conversationId}/messages:
     parameters:
-      - $ref: "#/components/parameters/ConversationIdParam"
+      - $ref: "#/components/parameters/ConversationId"
+
     get:
-      summary: Lists messages in a conversation
-      description: >
-        Retrieves messages for the specified conversation in reverse chronological order (most recent first).
-        The user must be a participant to access messages.
-      operationId: listMessages
+      summary: List messages in conversation
       parameters:
         - name: limit
           in: query
-          description: Number of messages to return (pagination)
-          required: false
           schema:
             type: integer
             minimum: 1
@@ -476,14 +393,12 @@ paths:
             default: 50
         - name: before
           in: query
-          description: ISO8601 datetime to return messages created before this timestamp (for pagination)
-          required: false
           schema:
             type: string
             format: date-time
       responses:
         '200':
-          description: Messages retrieved successfully
+          description: Messages retrieved
           content:
             application/json:
               schema:
@@ -491,39 +406,14 @@ paths:
                 items:
                   $ref: "#/components/schemas/Message"
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
         '403':
-          description: Forbidden – not a participant
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Forbidden"
         '404':
-          description: Conversation not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/NotFound"
 
     post:
-      summary: Sends a new message (text or photo) or replies to an existing message
-      description: >
-        Sends a new message to the conversation. To reply, include `replyToMessageId`.  
-        The message will appear in participants' conversation lists and its status will be `delivered` once received by all recipients, and `read` when read by all recipients.
-      operationId: sendMessage
+      summary: Send new message
       requestBody:
         required: true
         content:
@@ -533,7 +423,7 @@ paths:
               properties:
                 text:
                   type: string
-                  example: "Hola a todos"
+                  example: "Hello everyone"
                 photoUrl:
                   type: string
                   format: uri
@@ -546,58 +436,27 @@ paths:
                 - required: ["photoUrl"]
       responses:
         '201':
-          description: Message sent successfully
+          description: Message sent
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
         '400':
-          description: Bad request – missing content or invalid fields
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
         '403':
-          description: Forbidden – not a participant
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Forbidden"
         '404':
-          description: Conversation not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/NotFound"
 
   /conversations/{conversationId}/messages/{messageId}:
     parameters:
-      - $ref: "#/components/parameters/ConversationIdParam"
-      - $ref: "#/components/parameters/MessageIdParam"
+      - $ref: "#/components/parameters/ConversationId"
+      - $ref: "#/components/parameters/MessageId"
+
     post:
-      summary: Forwards one of my messages to another conversation
-      description: >
-        Forward a message to another conversation. The body must contain `targetConversationId`.
-        Only the sender of the original message may forward it (business rule — enforced server-side).
-      operationId: forwardMessage
+      summary: Forward a message
       requestBody:
         required: true
         content:
@@ -608,106 +467,44 @@ paths:
                 targetConversationId:
                   type: string
                   example: "conv456"
-              required:
-                - targetConversationId
+              required: [targetConversationId]
       responses:
         '201':
-          description: Message forwarded successfully
+          description: Message forwarded
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
         '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
         '403':
-          description: Forbidden – not allowed to forward or not a participant in target
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Forbidden"
         '404':
-          description: Conversation or message not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/NotFound"
 
     delete:
-      summary: Deletes a sent message
-      description: >
-        Deletes a message that the authenticated user sent. Depending on backend retention policy, the message may be deleted for everyone or only hidden. Only the sender may delete their message.
-      operationId: deleteMessage
+      summary: Delete a sent message
       responses:
         '204':
-          description: Message deleted successfully (no content)
+          description: Message deleted
         '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
         '403':
-          description: Forbidden – not the sender or insufficient permissions
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Forbidden"
         '404':
-          description: Message or conversation not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/NotFound"
 
   /conversations/{conversationId}/messages/{messageId}/reactions:
     parameters:
-      - $ref: "#/components/parameters/ConversationIdParam"
-      - $ref: "#/components/parameters/MessageIdParam"
+      - $ref: "#/components/parameters/ConversationId"
+      - $ref: "#/components/parameters/MessageId"
+
     post:
-      summary: Adds a reaction (comment) on an existing message
-      description: >
-        Adds a reaction (emoji) to a message. Returns the created Reaction object (with id).
-      operationId: commentMessage
+      summary: Add a reaction
       requestBody:
         required: true
         content:
@@ -718,96 +515,44 @@ paths:
                 emoji:
                   type: string
                   example: "👍"
-              required:
-                - emoji
+              required: [emoji]
       responses:
         '201':
-          description: Reaction added successfully
+          description: Reaction added
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Reaction"
         '400':
-          description: Bad request – invalid emoji
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
         '403':
-          description: Forbidden – not a participant
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Forbidden"
         '404':
-          description: Message or conversation not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/NotFound"
 
   /conversations/{conversationId}/messages/{messageId}/reactions/{reactionId}:
     parameters:
-      - $ref: "#/components/parameters/ConversationIdParam"
-      - $ref: "#/components/parameters/MessageIdParam"
-      - $ref: "#/components/parameters/ReactionIdParam"
+      - $ref: "#/components/parameters/ConversationId"
+      - $ref: "#/components/parameters/MessageId"
+      - $ref: "#/components/parameters/ReactionId"
+
     delete:
-      summary: Removes a reaction (comment) from a message
-      description: >
-        Removes the specified reaction. Users may remove their own reactions; admins may remove any.
-      operationId: uncommentMessage
+      summary: Remove a reaction
       responses:
         '204':
-          description: Reaction removed successfully
+          description: Reaction removed
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
         '403':
-          description: Forbidden – not allowed to remove this reaction
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Forbidden"
         '404':
-          description: Reaction, message, or conversation not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/NotFound"
+
   /groups:
     post:
-      summary: Creates a new group
-      operationId: createGroup
+      summary: Create a new group
       requestBody:
         required: true
         content:
@@ -817,46 +562,31 @@ paths:
               properties:
                 name:
                   type: string
-                  example: "Amigos del trabajo"
+                  example: "Work Friends"
                 users:
                   type: array
                   items:
                     type: string
                   example: ["user123", "user456"]
-              required:
-                - name
+              required: [name]
       responses:
         '201':
-          description: Group created successfully
+          description: Group created
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Conversation"
         '400':
-          description: Bad request – invalid payload
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
 
   /groups/{groupId}/users:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
+      - $ref: "#/components/parameters/GroupId"
+
     post:
-      summary: Adds a user to the group
-      operationId: addToGroup
+      summary: Add user to group
       requestBody:
         required: true
         content:
@@ -867,85 +597,38 @@ paths:
                 userId:
                   type: string
                   example: "user789"
-              required:
-                - userId
+              required: [userId]
       responses:
         '200':
-          description: User added to group successfully
+          description: User added
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Conversation"
         '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
         '403':
-          description: Forbidden – only group members may add users (or others depending on policy)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Forbidden"
         '404':
-          description: Group or user not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/NotFound"
 
     delete:
-      summary: Leaves the group
-      operationId: leaveGroup
-      description: >
-        Authenticated user will be removed from the group participants. If they are the last participant, backend may delete group.
+      summary: Leave group
       responses:
         '204':
-          description: Left group successfully
+          description: Left group
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
         '404':
-          description: Group not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/NotFound"
 
   /groups/{groupId}/name:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
+      - $ref: "#/components/parameters/GroupId"
     put:
-      summary: Changes the group name
-      operationId: setGroupName
+      summary: Change group name
       requestBody:
         required: true
         content:
@@ -955,59 +638,29 @@ paths:
               properties:
                 name:
                   type: string
-                  example: "Nuevo nombre del grupo"
-              required:
-                - name
+                  example: "New Group Name"
+              required: [name]
       responses:
         '200':
-          description: Group name changed successfully
+          description: Name changed
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Conversation"
         '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
         '403':
-          description: Forbidden – only group members can change name (or only admins depending on policy)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Forbidden"
         '404':
-          description: Group not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/NotFound"
 
   /groups/{groupId}/photo:
     parameters:
-      - $ref: "#/components/parameters/GroupIdParam"
+      - $ref: "#/components/parameters/GroupId"
     put:
-      summary: Updates the group photo
-      operationId: setGroupPhoto
+      summary: Update group photo
       requestBody:
         required: true
         content:
@@ -1020,44 +673,20 @@ paths:
                   format: binary
       responses:
         '200':
-          description: Group photo updated successfully
+          description: Photo updated
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Conversation"
         '400':
-          description: Bad request – missing or invalid file
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/BadRequest"
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Unauthorized"
         '403':
-          description: Forbidden – only group members can update (or restricted)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+          $ref: "#/components/responses/Forbidden"
         '415':
-          description: Unsupported media type – only images allowed
+          description: Unsupported media type
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+                $ref: "#/components/schemas/ErrorResponse"

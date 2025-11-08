@@ -98,21 +98,20 @@ components:
           type: string
           format: date-time
           example: "2025-11-04T10:30:00Z"
-        forwardedFrom:
-          type: object
-          description: Information about the original message if this message was forwarded
-          properties:
-            conversationId:
-              type: string
-              example: "conv456"
-            messageId:
-              type: string
-              example: "msg999"
+
         reactions:
           type: array
           items:
             $ref: "#/components/schemas/Reaction"
-
+        status:
+          type: string
+          enum: [sent, delivered, read]
+          example: "read"
+          description: >
+            Message status:  
+            - sent: sent but not yet delivered  
+            - delivered: received by all recipients  
+            - read: read by all recipients
 
 paths:
   /session:
@@ -230,8 +229,58 @@ paths:
   /me/photo:
     put:
       summary: Updates the current user's profile photo
+      description: >
+        Uploads and sets a new profile photo for the authenticated user.  
+        The request must include a valid image file (e.g., JPEG, PNG, or GIF).
       operationId: setMyPhoto
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                  description: The new profile image file.
       responses:
+        '200':
+          description: Photo updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Bad request – missing or invalid file
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Missing photo file."
+        '401':
+          description: Unauthorized – authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Missing or invalid token."
+        '415':
+          description: Unsupported media type – only images allowed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Unsupported image format. Allowed types: JPG, PNG, GIF."
   /users:
     get:
       summary: List all users or search by name

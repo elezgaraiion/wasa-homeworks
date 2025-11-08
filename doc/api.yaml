@@ -344,11 +344,11 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Optional search string (letters only)
+          description: Optional search string (letters and spaces)
           required: false
           schema:
             type: string
-            pattern: '^[A-Za-zÀ-ÿ]{0,16}$'
+            pattern: '^[A-Za-zÀ-ÿ ]{0,32}$'
             example: "Maria"
       responses:
         '200':
@@ -368,7 +368,7 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: "Invalid search query. Only letters are allowed."
+                    example: "Invalid search query. Only letters and spaces are allowed."
         '401':
           description: Unauthorized – authentication required
           content:
@@ -413,13 +413,7 @@ paths:
         The user must be a participant of the conversation to access it.
       operationId: getConversation
       parameters:
-        - name: conversationId
-          in: path
-          required: true
-          description: Unique identifier of the conversation
-          schema:
-            type: string
-            example: "conv123"
+        - $ref: "#/components/parameters/ConversationIdParam"
       responses:
         '200':
           description: Conversation retrieved successfully
@@ -458,14 +452,137 @@ paths:
                     type: string
                     example: "Conversation not found."
   /conversations/{conversationId}/messages:
+    parameters:
+      - $ref: "#/components/parameters/ConversationIdParam"
+    get:
+      summary: Lists messages in a conversation
+      description: >
+        Retrieves messages for the specified conversation in reverse chronological order (most recent first).
+        The user must be a participant to access messages.
+      operationId: listMessages
+      parameters:
+        - name: limit
+          in: query
+          description: Number of messages to return (pagination)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: before
+          in: query
+          description: ISO8601 datetime to return messages created before this timestamp (for pagination)
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '403':
+          description: Forbidden – not a participant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
     post:
-      summary: Adds a reaction (comment) on a existing message
-      operationId: commentMessage
+      summary: Sends a new message (text or photo) or replies to an existing message
+      description: >
+        Sends a new message to the conversation. To reply, include `replyToMessageId`.  
+        The message will appear in participants' conversation lists and its status will be `delivered` once received by all recipients, and `read` when read by all recipients.
+      operationId: sendMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  example: "Hola a todos"
+                photoUrl:
+                  type: string
+                  format: uri
+                  example: "https://example.com/pic.jpg"
+                replyToMessageId:
+                  type: string
+                  example: "msg000"
+              anyOf:
+                - required: ["text"]
+                - required: ["photoUrl"]
       responses:
-    delete:
-      summary: Removes a reaction (comment) from a message
-      operationId: uncommentMessage
-      responses:
+        '201':
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        '400':
+          description: Bad request – missing content or invalid fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '403':
+          description: Forbidden – not a participant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
   /conversations/{conversationId}/messages/{messageId}:
     post:
       summary: Forwards one of my messages to another conversation

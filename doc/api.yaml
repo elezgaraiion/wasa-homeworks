@@ -7,9 +7,16 @@ info:
     Includes simplified login, user management, conversations, messages, and group handling.
   version: 1.0.0
 security:
-  - BearerAuth: []
+  - bearerAuth: []
 
 components:
+  
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  
   schemas:
 
     User:
@@ -56,7 +63,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/User"
-
+    Reaction:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        emoji:
+          type: string
+          example: "😂"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2025-11-08T15:00:00Z"
     Message:
       type: object
       description: Represents a message sent in a conversation
@@ -90,22 +108,17 @@ components:
             messageId:
               type: string
               example: "msg999"
-    Reaction:
-      type: object
-      properties:
-        user:
-          $ref: "#/components/schemas/User"
-        emoji:
-          type: string
-          example: "😂"
-        createdAt:
-          type: string
-          format: date-time
-          example: "2025-11-08T15:00:00Z"
+        reactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reaction"
+
+
 paths:
   /session:
     post:
       summary: Logs in or registers the user
+      security: []
       description: >
         Simplified login:  
         If the username exists, the user is logged in.  

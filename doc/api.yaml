@@ -16,11 +16,8 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: "user-id"
-
-  #-----------------------------------------------
-  # Shared Schemas
-  #-----------------------------------------------
+      bearerFormat: "identifier"
+      description: "Use the identifier returned by /session as bearer token."
 
   schemas:
 
@@ -33,9 +30,8 @@ components:
 
     User:
       type: object
-      description: Represents an application user
       properties:
-        id:
+        userId:
           type: string
           example: "user123"
         name:
@@ -43,15 +39,12 @@ components:
           example: "Maria"
         photo:
           type: string
-          format: uri
           example: "https://example.com/maria.jpg"
-      required: [id, name]
 
     Conversation:
       type: object
-      description: Represents a conversation (direct or group)
       properties:
-        id:
+        convId:
           type: string
           example: "conv123"
         type:
@@ -63,7 +56,6 @@ components:
           example: "Work Friends"
         photo:
           type: string
-          format: uri
           example: "https://example.com/group-photo.jpg"
         lastMessagePreview:
           type: string
@@ -76,12 +68,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/User"
-      required: [id, type, participants]
-
     Reaction:
       type: object
       properties:
-        id:
+        reactId:
           type: string
           example: "react789"
         user:
@@ -93,13 +83,11 @@ components:
           type: string
           format: date-time
           example: "2025-11-08T15:00:00Z"
-      required: [id, user, emoji, createdAt]
 
     Message:
       type: object
-      description: Represents a message sent in a conversation
       properties:
-        id:
+        messageId:
           type: string
           example: "msg001"
         sender:
@@ -133,11 +121,6 @@ components:
             Message status:
             - delivered: received by all recipients
             - read: read by all recipients
-      required: [id, sender, conversationId, createdAt, status]
-
-  #-----------------------------------------------
-  # Shared Parameters
-  #-----------------------------------------------
 
   parameters:
     ConversationId:
@@ -176,9 +159,6 @@ components:
         type: string
         example: "react789"
 
-  #-----------------------------------------------
-  # Shared Error Responses
-  #-----------------------------------------------
 
   responses:
     Unauthorized:
@@ -216,21 +196,22 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
 
-#-----------------------------------------------
-# Paths
-#-----------------------------------------------
 
 paths:
 
   /session:
     post:
-      summary: Log in or register
+      tags: ["login"]
+      summary: Logs in the 
       security: []
-      description: >
-        Simplified login:  
-        If the username exists, the user is logged in.  
-        If not, a new user is created and logged in.
+      description: |-
+        If the user does not exist, it will be created,
+        and an identifier is returned.
+        If the user exists, the user identifier is returned.
+      operationId: doLogin
       requestBody:
+        description: User details
+        
         required: true
         content:
           application/json:
@@ -239,38 +220,37 @@ paths:
               properties:
                 name:
                   type: string
-                  example: "Maria"
-                  pattern: '^[A-Za-zÀ-ÿ]{3,16}$'
-              required: [name]
+                  example: Maria
+                  pattern: '^.*?$'
+                  minLength: 3
+                  maxLength: 16
+              required:
+                - name
       responses:
         '201':
-          description: User logged in or created
+          description: User log-in action successful
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   identifier:
+                   
                     type: string
-                    example: "abcdef012345"
-        '400':
-          $ref: "#/components/responses/BadRequest"
 
   /me/username:
     put:
       summary: Update user name
+      operationId: setMyUserName
+
       description: Change authenticated user's name
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: "Maria Lopez"
-              required: [name]
+              type: string 
+              minLength: 1
       responses:
         '200':
           description: Username updated
@@ -288,24 +268,28 @@ paths:
   /me/photo:
     put:
       summary: Update profile photo
+      operationId: setMyPhoto
       description: Upload and set a new profile photo
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
               properties:
                 photo:
                   type: string
-                  format: binary
       responses:
         '200':
           description: Photo updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                type: object
+                properties:
+                   username:
+                    type: string
+                    minLength: 1
         '400':
           $ref: "#/components/responses/BadRequest"
         '401':
@@ -320,6 +304,7 @@ paths:
   /users:
     get:
       summary: List or search users
+      operationId: listUsers
       parameters:
         - name: q
           in: query
@@ -346,6 +331,7 @@ paths:
   /conversations:
     get:
       summary: List user conversations
+      operationId: getMyConversations
       responses:
         '200':
           description: List of conversations
@@ -361,8 +347,11 @@ paths:
   /conversations/{conversationId}:
     get:
       summary: Get a specific conversation
+      operationId: getConversation
       parameters:
         - $ref: "#/components/parameters/ConversationId"
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Conversation details
@@ -383,6 +372,7 @@ paths:
 
     get:
       summary: List messages in conversation
+      operationId: listMessagesInConversation
       parameters:
         - name: limit
           in: query
@@ -414,6 +404,7 @@ paths:
 
     post:
       summary: Send new message
+      operationId: sendMessage
       requestBody:
         required: true
         content:
@@ -457,17 +448,21 @@ paths:
 
     post:
       summary: Forward a message
+      operationId: forwardMessage
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                targetConversationId:
-                  type: string
-                  example: "conv456"
-              required: [targetConversationId]
+              type: array
+              items:
+                type: object
+                properties:
+                  targetConversationId:
+                    type: string
+                    example: "conv456"
+                required: 
+                  - targetConversationId
       responses:
         '201':
           description: Message forwarded
@@ -486,6 +481,7 @@ paths:
 
     delete:
       summary: Delete a sent message
+      operationId: deleteMessage
       responses:
         '204':
           description: Message deleted
@@ -505,24 +501,16 @@ paths:
 
     post:
       summary: Add a reaction
+      operationId: addReaction
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                emoji:
-                  type: string
-                  example: "👍"
-              required: [emoji]
+              $ref: '#/components/schemas/Reaction'
       responses:
-        '201':
-          description: Reaction added
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Reaction"
+        '200':
+          description: Reaction added successfully
         '400':
           $ref: "#/components/responses/BadRequest"
         '401':
@@ -532,14 +520,9 @@ paths:
         '404':
           $ref: "#/components/responses/NotFound"
 
-  /conversations/{conversationId}/messages/{messageId}/reactions/{reactionId}:
-    parameters:
-      - $ref: "#/components/parameters/ConversationId"
-      - $ref: "#/components/parameters/MessageId"
-      - $ref: "#/components/parameters/ReactionId"
-
     delete:
       summary: Remove a reaction
+      operationId: removeReaction
       responses:
         '204':
           description: Reaction removed
@@ -587,6 +570,7 @@ paths:
 
     post:
       summary: Add user to group
+      operationId: addUserToGroup
       requestBody:
         required: true
         content:
@@ -616,6 +600,7 @@ paths:
 
     delete:
       summary: Leave group
+      operationId: leaveGroup
       responses:
         '204':
           description: Left group
@@ -629,6 +614,7 @@ paths:
       - $ref: "#/components/parameters/GroupId"
     put:
       summary: Change group name
+      operationId: changeGroupName
       requestBody:
         required: true
         content:
@@ -661,6 +647,7 @@ paths:
       - $ref: "#/components/parameters/GroupId"
     put:
       summary: Update group photo
+      operationId: updateGroupPhoto
       requestBody:
         required: true
         content:

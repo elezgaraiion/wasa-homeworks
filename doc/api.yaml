@@ -276,10 +276,6 @@ components:
         maxLength: 64
         pattern: '^[A-Za-z0-9_-]+$'
 
-  #-----------------------------------------------
-  # Shared Error Responses
-  #-----------------------------------------------
-
   responses:
     Unauthorized:
       description: Unauthorized
@@ -316,9 +312,6 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
 
-#-----------------------------------------------
-# Paths
-#-----------------------------------------------
 
 paths:
 

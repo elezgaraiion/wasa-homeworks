@@ -11,8 +11,8 @@ security:
   - bearerAuth: []
 
 tags:
-  - name: Auth
-    description: Authentication and session management.
+  - name: Login
+    description: Session management.
   - name: Profile
     description: Operations related to the authenticated user's profile.
   - name: Users
@@ -317,49 +317,38 @@ paths:
 
   /session:
     post:
-      summary: Log in or register
-      description: >
-        Simplified login. If the username exists, the user is logged in;
-        otherwise, a new user is created and logged in.
+      tags: [Login]
+      summary: Logs in the user
+      description: |-
+        If the user does not exist, it will be created,
+        and an identifier is returned.
+        If the user exists, the user identifier is returned.
       operationId: doLogin
-      tags: [Auth]
-      security: []
       requestBody:
-        required: true
+        description: User details
         content:
           application/json:
             schema:
               type: object
-              description: Payload used to log in or create a new session.
               properties:
                 name:
                   type: string
-                  description: Desired username for login or registration.
-                  example: "Maria"
+                  example: Maria
+                  pattern: 'ˆ.*?$'
                   minLength: 3
                   maxLength: 16
-                  pattern: '^[A-Za-zÀ-ÿ]{3,16}$'
-              required: [name]
+        required: true
       responses:
         '201':
-          description: User logged in or created successfully.
+          description: User log-in action successful
           content:
             application/json:
               schema:
                 type: object
-                description: Session identifier returned on successful login.
                 properties:
                   identifier:
                     type: string
-                    description: Token-like identifier used as bearer token.
                     example: "abcdef012345"
-                    minLength: 8
-                    maxLength: 128
-                    pattern: '^[A-Za-z0-9_-]+$'
-                required:
-                  - identifier
-        '400':
-          $ref: "#/components/responses/BadRequest"
 
   /me:
     get:

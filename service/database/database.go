@@ -3,13 +3,13 @@ package database
 import (
 	"database/sql"
 	"errors"
-	"fmt"
+	"github.com/aritz/wasa-homeworks/service/models"
 )
 
 // AppDatabase is the high level interface for the DB
 type AppDatabase interface {
 
-
+	CreateUser(u models.User) error
 	Ping() error
 }
 
@@ -20,25 +20,75 @@ type appdbimpl struct {
 // New returns a new instance of AppDatabase based on the SQLite connection `db`.
 // `db` is required - an error will be returned if `db` is `nil`.
 func New(db *sql.DB) (AppDatabase, error) {
-	if db == nil {
-		return nil, errors.New("database is required when building a AppDatabase")
-	}
+    if db == nil {
+        return nil, errors.New("database connection required")
+    }
 
-	// Check if table exists. If not, the database is empty, and we need to create the structure
-	var tableName string
-	err := db.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name='example_table';`).Scan(&tableName)
-	if errors.Is(err, sql.ErrNoRows) {
-		sqlStmt := `CREATE TABLE example_table (id INTEGER NOT NULL PRIMARY KEY, name TEXT);`
-		_, err = db.Exec(sqlStmt)
-		if err != nil {
-			return nil, fmt.Errorf("error creating database structure: %w", err)
-		}
-	}
+    // Crear tabla Users
+    _, err := db.Exec(`
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            photo TEXT
+        );
+    `)
+    if err != nil {
+        return nil, err
+    }
 
-	return &appdbimpl{
-		c: db,
-	}, nil
+    // Crear tabla Conversations
+    _, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS conversations (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            name TEXT,
+            photo TEXT,
+            last_message_preview TEXT,
+            last_message_at TEXT
+        );
+    `)
+    if err != nil {
+        return nil, err
+    }
+
+    // Crear tabla Messages
+    _, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS messages (
+            id TEXT PRIMARY KEY,
+            sender_id TEXT NOT NULL,
+            conversation_id TEXT NOT NULL,
+            text TEXT,
+            photo TEXT,
+            reply_to_message_id TEXT,
+            created_at TEXT NOT NULL,
+            status TEXT NOT NULL,
+            FOREIGN KEY(sender_id) REFERENCES users(id),
+            FOREIGN KEY(conversation_id) REFERENCES conversations(id)
+        );
+    `)
+    if err != nil {
+        return nil, err
+    }
+
+    // Crear tabla Reactions
+    _, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS reactions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            message_id TEXT NOT NULL,
+            emoji TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(message_id) REFERENCES messages(id)
+        );
+    `)
+    if err != nil {
+        return nil, err
+    }
+
+    return &appdbimpl{c: db}, nil
 }
+
 
 func (db *appdbimpl) Ping() error {
 	return db.c.Ping()

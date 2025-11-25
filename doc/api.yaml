@@ -123,7 +123,8 @@ components:
           type: string
           format: date-time
           description: Timestamp of the most recent message in the conversation (ISO 8601).
-          example: "2025-11-04T20:00:00Z"
+          example: "2025-11-04T20:00:00
+          Z"
         participants:
           type: array
           description: List of users participating in the conversation.

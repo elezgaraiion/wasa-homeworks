@@ -354,7 +354,7 @@ paths:
   /me:
     get:
       summary: Get current user
-      description: Retrieve the profile of the authenticated user.
+      description: Retrieve the profile of the user.
       operationId: getCurrentUser
       tags: [Profile]
       responses:

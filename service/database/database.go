@@ -10,6 +10,9 @@ import (
 type AppDatabase interface {
 
 	CreateUser(u models.User) error
+    GetUserIdByName(name string) (string, error)
+    GetUserByID(id string) (models.User, error)
+    UpdateUserName(id,newName string)(models.User, error)
 	Ping() error
 }
 

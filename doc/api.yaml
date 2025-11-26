@@ -500,6 +500,51 @@ paths:
         '401':
           $ref: "#/components/responses/Unauthorized"
 
+    post:
+      summary: Create a new group
+      description: Create a new group conversation and optionally add initial members.
+      operationId: createGroup
+      tags: [Groups]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Payload for creating a group conversation.
+              properties:
+                name:
+                  type: string
+                  description: Name of the new group.
+                  example: "Work Friends"
+                  minLength: 1
+                  maxLength: 100
+                  pattern: '^[A-Za-zÀ-ÿ0-9 .''-]{1,100}$'
+                users:
+                  type: array
+                  description: Optional list of user IDs to be added as initial members.
+                  minItems: 0
+                  maxItems: 512
+                  items:
+                    type: string
+                    description: User identifier.
+                    minLength: 1
+                    maxLength: 64
+                    pattern: '^[A-Za-z0-9_-]+$'
+                  example: ["user123", "user456"]
+              required: [name]
+      responses:
+        '201':
+          description: Group created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        '400':
+          $ref: "#/components/responses/BadRequest"
+        '401':
+          $ref: "#/components/responses/Unauthorized"
+
   /conversations/{conversationId}:
     get:
       summary: Get a specific conversation
@@ -787,122 +832,12 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   /groups:
-    get:
-      summary: List user groups
-      description: Retrieve all group conversations where the authenticated user is a participant.
-      operationId: listGroups
-      tags: [Groups]
-      responses:
-        '200':
-          description: List of group conversations.
-          content:
-            application/json:
-              schema:
-                type: array
-                description: Array of group conversations.
-                minItems: 0
-                maxItems: 1000
-                items:
-                  $ref: "#/components/schemas/Conversation"
-        '401':
-          $ref: "#/components/responses/Unauthorized"
-
-    post:
-      summary: Create a new group
-      description: Create a new group conversation and optionally add initial members.
-      operationId: createGroup
-      tags: [Groups]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Payload for creating a group conversation.
-              properties:
-                name:
-                  type: string
-                  description: Name of the new group.
-                  example: "Work Friends"
-                  minLength: 1
-                  maxLength: 100
-                  pattern: '^[A-Za-zÀ-ÿ0-9 .''-]{1,100}$'
-                users:
-                  type: array
-                  description: Optional list of user IDs to be added as initial members.
-                  minItems: 0
-                  maxItems: 512
-                  items:
-                    type: string
-                    description: User identifier.
-                    minLength: 1
-                    maxLength: 64
-                    pattern: '^[A-Za-z0-9_-]+$'
-                  example: ["user123", "user456"]
-              required: [name]
-      responses:
-        '201':
-          description: Group created successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Conversation"
-        '400':
-          $ref: "#/components/responses/BadRequest"
-        '401':
-          $ref: "#/components/responses/Unauthorized"
+    
 
   /groups/{groupId}:
-    parameters:
-      - $ref: "#/components/parameters/GroupId"
+    
 
-    get:
-      summary: Get group
-      description: Retrieve detailed information about a specific group conversation.
-      operationId: getGroupById
-      tags: [Groups]
-      responses:
-        '200':
-          description: Group details.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Conversation"
-        '401':
-          $ref: "#/components/responses/Unauthorized"
-        '403':
-          $ref: "#/components/responses/Forbidden"
-        '404':
-          $ref: "#/components/responses/NotFound"
-
-  /groups/{groupId}/users:
-    parameters:
-      - $ref: "#/components/parameters/GroupId"
-
-    get:
-      summary: List group members
-      description: Retrieve all users that belong to a specific group.
-      operationId: listGroupUsers
-      tags: [Groups]
-      responses:
-        '200':
-          description: List of users in the group.
-          content:
-            application/json:
-              schema:
-                type: array
-                description: Array of group members.
-                minItems: 0
-                maxItems: 512
-                items:
-                  $ref: "#/components/schemas/User"
-        '401':
-          $ref: "#/components/responses/Unauthorized"
-        '403':
-          $ref: "#/components/responses/Forbidden"
-        '404':
-          $ref: "#/components/responses/NotFound"
-
+  /conversations/{conversationId}/users:
     post:
       summary: Add user to group
       description: Add an existing user to an existing group.
@@ -940,6 +875,7 @@ paths:
         '404':
           $ref: "#/components/responses/NotFound"
 
+  /conversations/{conversationId}/users/me:
     delete:
       summary: Leave group
       description: Remove the authenticated user from the specified group.
@@ -953,7 +889,7 @@ paths:
         '404':
           $ref: "#/components/responses/NotFound"
 
-  /groups/{groupId}/name:
+  /conversation/{conversationId}/name:
     parameters:
       - $ref: "#/components/parameters/GroupId"
     put:
@@ -993,7 +929,7 @@ paths:
         '404':
           $ref: "#/components/responses/NotFound"
 
-  /groups/{groupId}/photo:
+  /conversation/{conversationId}/photo:
     parameters:
       - $ref: "#/components/parameters/GroupId"
     put:

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"github.com/julienschmidt/httprouter"
+	"os"
+	"image"
 
 )
 
@@ -67,4 +69,61 @@ func (rt *_router) updateMyUserName(w http.ResponseWriter, r *http.Request, _ ht
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(updatedUser)
 	}
-	
+func (rt *_router) UpdatePhoto(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	// 1. Autenticación
+	userID := r.Header.Get("Authorization")
+	if userID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Parsear multipart/form-data
+	err := r.ParseMultipartForm(10 << 20) // máximo 10 MB
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	file, handler, err := r.FormFile("photoFile")
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	contentType := handler.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
+		return
+	}
+	// 3. Guardar archivo localmente (por simplicidad, en tmp/)
+	dst := "/tmp/" + handler.Filename
+	f, err := os.Create(dst)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+	_, format, err := image.Decode(file)
+	if err != nil || format != "jpeg" {
+    	http.Error(w, "unsupported media type: only JPEG allowed", http.StatusUnsupportedMediaType)
+    	return
+	}
+
+	// resetear el puntero del file antes de copiarlo
+	_, err = file.Seek(0, 0)
+	if err != nil {
+    	http.Error(w, "internal server error", http.StatusInternalServerError)
+    	return
+	}
+
+	// 4. Actualizar en la DB
+	user, err := rt.db.UpdateMyPhoto(userID, dst)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// 5. Devolver usuario actualizado
+	json.NewEncoder(w).Encode(user)
+}

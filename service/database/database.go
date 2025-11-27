@@ -14,7 +14,8 @@ type AppDatabase interface {
     GetUserByID(id string) (models.User, error)
     UpdateUserName(id,newName string)(models.User, error)
     UpdateMyPhoto(id,photoURL string)(models.User, error)
-	Ping() error
+    ListUsers(query, currentUserID string) ([]models.User, error)	
+    Ping() error
 }
 
 type appdbimpl struct {

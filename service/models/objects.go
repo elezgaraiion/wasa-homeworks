@@ -15,7 +15,8 @@ type Conversation struct {
 	Photo             string    `db:"photo,omitempty"`               
 	LastMessagePreview string   `db:"last_message_preview,omitempty"`
 	LastMessageAt     time.Time `db:"last_message_at,omitempty"`     
-	Participants      []User    `db:"participants"`                  
+	Participants      []User    `db:"participants"`  
+	TempOrderAt time.Time `json:"-"`                
 }
 
 type Reaction struct {

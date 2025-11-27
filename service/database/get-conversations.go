@@ -3,72 +3,121 @@ package database
 import (
 	"sort"
 	"time"
-
+	"database/sql"
 	"github.com/aritz/wasa-homeworks/service/models"
 )
 
 func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, error) {
-	// 1. Traer todas las conversaciones
-	rows, err := db.c.Query("SELECT id, type, name, photo, last_message_preview, last_message_at FROM conversations")
+	rows, err := db.c.Query(`
+		SELECT c.id, c.type, c.name, c.photo,
+		       c.last_message_preview, c.last_message_at,
+		       m.joined_at
+		FROM conversations c
+		JOIN conversation_participants p ON p.conversation_id = c.id
+		LEFT JOIN conversation_user_meta m
+		  ON m.conversation_id = c.id AND m.user_id = ?
+		WHERE p.user_id = ?`, userID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var allConvs []models.Conversation
+	var convs []models.Conversation
+
 	for rows.Next() {
 		var conv models.Conversation
-		var lastMsgAt string
-		err := rows.Scan(&conv.ID, &conv.Type, &conv.Name, &conv.Photo, &conv.LastMessagePreview, &lastMsgAt)
-		if err != nil {
+
+		var lastMsgAt sql.NullString
+		var joinedAt sql.NullString
+		var preview sql.NullString
+		var name sql.NullString
+		var photo sql.NullString
+
+		if err := rows.Scan(
+			&conv.ID,
+			&conv.Type,
+			&name,
+			&photo,
+			&preview,
+			&lastMsgAt,
+			&joinedAt,
+		); err != nil {
 			return nil, err
 		}
-		if lastMsgAt != "" {
-			conv.LastMessageAt, _ = time.Parse(time.RFC3339, lastMsgAt)
+
+		if name.Valid {
+			conv.Name = name.String
 		}
-		// TODO: Traer participantes de alguna forma (si los tienes en JSON o tabla aparte)
+		if photo.Valid {
+			conv.Photo = photo.String
+		}
+		if preview.Valid {
+			conv.LastMessagePreview = preview.String
+		}
+
+		// Parse LastMessageAt si existe, sino default a zero
+		conv.LastMessageAt = time.Time{}
+		if lastMsgAt.Valid && lastMsgAt.String != "" {
+			t, _ := time.Parse(time.RFC3339, lastMsgAt.String)
+			conv.LastMessageAt = t
+		}
+
+		// Parse JoinedAt si existe
+		joinedAtTime := time.Time{}
+		if joinedAt.Valid && joinedAt.String != "" {
+			t, _ := time.Parse(time.RFC3339, joinedAt.String)
+			joinedAtTime = t
+		}
+
+		// Orden temporal: el mayor entre last_message_at y joined_at
+		conv.TempOrderAt = conv.LastMessageAt
+		if joinedAtTime.After(conv.LastMessageAt) {
+			conv.TempOrderAt = joinedAtTime
+		}
+
+		// Cargar participantes
 		conv.Participants, _ = db.getParticipantsByConversation(conv.ID)
 
-		allConvs = append(allConvs, conv)
+		convs = append(convs, conv)
 	}
 
-	// 2. Filtrar solo conversaciones donde participa el user
-	var myConvs []models.Conversation
-	for _, conv := range allConvs {
-		for _, user := range conv.Participants {
-			if user.ID == userID {
-				myConvs = append(myConvs, conv)
-				break
-			}
-		}
-	}
-
-	// 3. Ordenar por lastMessageAt descendente
-	sort.Slice(myConvs, func(i, j int) bool {
-		return myConvs[i].LastMessageAt.After(myConvs[j].LastMessageAt)
+	// Orden descendente por TempOrderAt
+	sort.Slice(convs, func(i, j int) bool {
+		return convs[i].TempOrderAt.After(convs[j].TempOrderAt)
 	})
 
-	return myConvs, nil
+	return convs, nil
 }
 
-// Ejemplo de función para obtener participantes
 func (db *appdbimpl) getParticipantsByConversation(convID string) ([]models.User, error) {
 	rows, err := db.c.Query(`
-        SELECT u.id, u.name, u.photo 
-        FROM users u
-        JOIN conversation_participants cp ON cp.user_id = u.id
-        WHERE cp.conversation_id = ?`, convID)
+		SELECT u.id, u.name, u.photo 
+		FROM users u
+		JOIN conversation_participants cp ON cp.user_id = u.id
+		WHERE cp.conversation_id = ?`, convID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	var participants []models.User
+
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Name, &u.Photo); err != nil {
+		var name sql.NullString
+		var photo sql.NullString
+
+		if err := rows.Scan(&u.ID, &name, &photo); err != nil {
 			return nil, err
 		}
+
+		if name.Valid {
+			u.Name = name.String
+		}
+		if photo.Valid {
+			u.Photo = photo.String
+		}
+
 		participants = append(participants, u)
 	}
 

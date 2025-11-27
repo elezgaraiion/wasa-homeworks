@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-
+	"log"
 	"github.com/aritz/wasa-homeworks/service/models"
 
 	"github.com/google/uuid"
@@ -54,6 +54,8 @@ func (rt *_router) GetMyConversations(w http.ResponseWriter, r *http.Request, _ 
 
 	convs, err := rt.db.GetMyConversations(userID)
 	if err != nil {
+		// 👇 Log para debug
+		log.Printf("ERROR GetMyConversations (%s): %v\n", userID, err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}

@@ -61,6 +61,16 @@ func New(db *sql.DB) (AppDatabase, error) {
             FOREIGN KEY (conversation_id) REFERENCES conversations(id),
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
+        CREATE TABLE IF NOT EXISTS conversation_user_meta (
+            conversation_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            joined_at TEXT NOT NULL,
+            last_seen_message_at TEXT,
+            PRIMARY KEY(conversation_id, user_id),
+            FOREIGN KEY(conversation_id) REFERENCES conversations(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
     `)
     if err != nil {
         return nil, err

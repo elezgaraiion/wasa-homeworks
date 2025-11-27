@@ -15,6 +15,7 @@ type AppDatabase interface {
     UpdateUserName(id,newName string)(models.User, error)
     UpdateMyPhoto(id,photoURL string)(models.User, error)
     ListUsers(query, currentUserID string) ([]models.User, error)	
+    GetMyConversations(userID string) ([]models.Conversation, error)
     Ping() error
 }
 
@@ -50,6 +51,15 @@ func New(db *sql.DB) (AppDatabase, error) {
             photo TEXT,
             last_message_preview TEXT,
             last_message_at TEXT
+        );
+
+        -- Tabla de participantes de la conversación
+        CREATE TABLE IF NOT EXISTS conversation_participants (
+            conversation_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            PRIMARY KEY (conversation_id, user_id),
+            FOREIGN KEY (conversation_id) REFERENCES conversations(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
         );
     `)
     if err != nil {

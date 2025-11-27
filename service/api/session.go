@@ -45,3 +45,19 @@ func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.
 	// 4. Devolver solo el ID del nuevo usuario
 	json.NewEncoder(w).Encode(map[string]string{"identifier": newUser.ID})
 }
+func (rt *_router) GetMyConversations(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	userID := r.Header.Get("Authorization")
+	if userID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	convs, err := rt.db.GetMyConversations(userID)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(convs)
+}

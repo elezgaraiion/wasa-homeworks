@@ -502,7 +502,7 @@ paths:
 
     post:
       summary: Create a new group
-      description: Create a new group conversation and optionally add initial members.
+      description: Create a new group conversation including the creator.
       operationId: createGroup
       tags: [Groups]
       requestBody:
@@ -532,7 +532,7 @@ paths:
                     maxLength: 64
                     pattern: '^[A-Za-z0-9_-]+$'
                   example: ["user123", "user456"]
-              required: [name]
+              required: [name,users]
       responses:
         '201':
           description: Group created successfully.

@@ -16,6 +16,7 @@ type AppDatabase interface {
     UpdateMyPhoto(id,photoURL string)(models.User, error)
     ListUsers(query, currentUserID string) ([]models.User, error)	
     GetMyConversations(userID string) ([]models.Conversation, error)
+    CreateGroup(creatorID string, name string, users []string) (models.Conversation, error)
     Ping() error
 }
 

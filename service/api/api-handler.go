@@ -9,8 +9,9 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.POST("/session", rt.doLogin)
 	rt.router.GET("/me", rt.doGetCurrentUser)
 	rt.router.PUT("/me/username", rt.updateMyUserName)
-	rt.router.PUT("/me/photo", rt.UpdatePhoto)
+	rt.router.PUT("/me/photo", rt.updatePhoto)
 	rt.router.GET("/users", rt.listOrSearchUsers)
-	rt.router.GET("/conversations", rt.GetMyConversations)
+	rt.router.GET("/conversations", rt.getMyConversations)
+	rt.router.POST("/conversations", rt.createGroup)
 	return rt.router
 }

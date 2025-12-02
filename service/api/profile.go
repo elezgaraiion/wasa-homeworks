@@ -69,7 +69,7 @@ func (rt *_router) updateMyUserName(w http.ResponseWriter, r *http.Request, _ ht
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(updatedUser)
 	}
-func (rt *_router) UpdatePhoto(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (rt *_router) updatePhoto(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	// 1. Autenticación
 	userID := r.Header.Get("Authorization")
 	if userID == "" {

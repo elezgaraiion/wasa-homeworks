@@ -18,6 +18,16 @@ type AppDatabase interface {
     GetMyConversations(userID string) ([]models.Conversation, error)
     CreateGroup(creatorID string, name string, users []string) (models.Conversation, error)
     GetConversationProfile(userID, convID string) (models.Conversation, error)
+    MarkConversationSeen(userID, convID string) error
+    GetMessagesInConversation(userID string,convID string,limit int,before string) ([]models.Message, error)
+    SendMessage(senderID, convID, text, photoURL, replyToMessageID string) (models.Message, error)
+    GetMessageByID(userID, convID, messageID string) (models.Message, error)
+    ForwardMessage(userID, sourceConvID, messageID, targetConvID string) (models.Message, error)
+    DeleteMessage(userID, convID, messageID string) error
+    GetReactions(messageID string) ([]models.Reaction, error)
+    IsUserInConversation(userID, convID string) (bool, error)
+    AddReaction(userID, convID, msgID, emoji string) (models.Reaction, error)
+    RemoveReaction(userID, convID, msgID, reactionID string) error
     Ping() error
 }
 

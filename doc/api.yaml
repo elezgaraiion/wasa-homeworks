@@ -566,6 +566,26 @@ paths:
           $ref: "#/components/responses/Forbidden"
         '404':
           $ref: "#/components/responses/NotFound"
+  /conversations/{conversationId}/seen:
+    post:
+    summary: Mark conversation as seen
+    description: >
+      Mark all messages before now as seen by current user.
+      For private chats, marks sender messages as seen.
+      For group chats, marks messages as seen individually per user.
+    operationId: markConversationSeen
+    tags: [Conversations]
+    parameters:
+      - $ref: "#/components/parameters/ConversationId"
+    responses:
+      '204':
+        description: Conversation marked as seen. No content returned.
+      '401':
+        $ref: "#/components/responses/Unauthorized"
+      '403':
+        $ref: "#/components/responses/Forbidden"
+      '404':
+        $ref: "#/components/responses/NotFound"
 
   /conversations/{conversationId}/messages:
     parameters:

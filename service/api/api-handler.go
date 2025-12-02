@@ -13,5 +13,6 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.GET("/users", rt.listOrSearchUsers)
 	rt.router.GET("/conversations", rt.getMyConversations)
 	rt.router.POST("/conversations", rt.createGroup)
+	rt.router.GET("/conversations/:conversationId", rt.GetConversationProfile)
 	return rt.router
 }

@@ -17,6 +17,7 @@ type AppDatabase interface {
     ListUsers(query, currentUserID string) ([]models.User, error)	
     GetMyConversations(userID string) ([]models.Conversation, error)
     CreateGroup(creatorID string, name string, users []string) (models.Conversation, error)
+    GetConversationProfile(userID, convID string) (models.Conversation, error)
     Ping() error
 }
 

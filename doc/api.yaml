@@ -850,13 +850,7 @@ paths:
           $ref: "#/components/responses/Forbidden"
         '404':
           $ref: "#/components/responses/NotFound"
-
-  /groups:
-    
-
-  /groups/{groupId}:
-    
-
+          
   /conversations/{conversationId}/users:
     post:
       summary: Add user to group

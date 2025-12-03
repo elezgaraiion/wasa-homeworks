@@ -29,6 +29,7 @@ type AppDatabase interface {
     AddReaction(userID, convID, msgID, emoji string) (models.Reaction, error)
     RemoveReaction(userID, convID, msgID, reactionID string) error
     AddUserToGroup(requestUserID, convID, targetUserID string) (models.Conversation, error)
+    LeaveGroup(userID, convID string) error
     Ping() error
 }
 

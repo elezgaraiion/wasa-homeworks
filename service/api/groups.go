@@ -56,3 +56,31 @@ func (rt *_router) addUserToGroup(w http.ResponseWriter, r *http.Request, ps htt
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(conv)
 }
+func (rt *_router) leaveGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    authUserID := r.Header.Get("Authorization")
+    if authUserID == "" {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    conversationID := ps.ByName("conversationId")
+    if conversationID == "" {
+        http.Error(w, "Missing conversationId", http.StatusBadRequest)
+        return
+    }
+
+    err := rt.db.LeaveGroup(authUserID, conversationID)
+    if err != nil {
+        switch err {
+        case models.ErrConversationNotFound:
+            http.Error(w, "Conversation not found", http.StatusNotFound)
+        case models.ErrForbidden:
+            http.Error(w, "Forbidden", http.StatusForbidden)
+        default:
+            http.Error(w, "Internal server error", http.StatusInternalServerError)
+        }
+        return
+    }
+
+    w.WriteHeader(http.StatusNoContent) // 204
+}

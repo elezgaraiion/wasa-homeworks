@@ -30,6 +30,8 @@ type AppDatabase interface {
     RemoveReaction(userID, convID, msgID, reactionID string) error
     AddUserToGroup(requestUserID, convID, targetUserID string) (models.Conversation, error)
     LeaveGroup(userID, convID string) error
+    SetGroupName(userID, convID, newName string) (models.Conversation, error)
+    SetGroupPhoto(userID, convID, photoURL string) (models.Conversation, error)
     Ping() error
 }
 

@@ -1,39 +1,80 @@
 // src/services/api.js
-const API_URL = 'http://localhost:3000'; // Asegúrate de que este es el puerto de tu Go
+const API_URL = 'http://localhost:3000'; 
 
 async function request(endpoint, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   
-  // Si ya tenemos token, lo inyectamos (para el futuro)
   const token = localStorage.getItem('userId');
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  
+  // CORRECCIÓN DEFINITIVA: 
+  // Enviamos solo el token limpio. 
+  // Si tu backend recibía "Bearer ...", ahora recibirá "af1d..."
+  if (token) {
+    headers['Authorization'] = token; 
+  }
 
   const config = { ...options, headers };
   
   try {
     const response = await fetch(`${API_URL}${endpoint}`, config);
+    
     if (!response.ok) {
-      // Intentamos leer el error que manda tu Go
+      if (response.status === 401) throw new Error('Unauthorized');
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Error en el servidor');
+      throw new Error(errorData.error || response.statusText);
     }
+
+    if (response.status === 204) return null;
     return response.json();
   } catch (err) {
-    console.error("API Error:", err);
     throw err;
   }
 }
 
-// Esta es la función que usaremos ahora
 export async function doLogin(name) {
-  // Tu backend espera POST /session con body { "name": "..." }
   return request('/session', {
     method: 'POST',
     body: JSON.stringify({ name })
   });
 }
 
-// Para obtener el perfil una vez logueado
 export async function getCurrentUser() {
   return request('/me');
+}
+
+export async function getConversations() {
+  return request('/conversations');
+}
+
+export async function updateUserName(newName) {
+  return request('/me/username', {
+    method: 'PUT',
+    body: JSON.stringify({ name: newName })
+  });
+}
+
+export async function updatePhoto(file) {
+  const formData = new FormData();
+  formData.append('photoFile', file); 
+
+  const token = localStorage.getItem('userId');
+  const headers = {};
+  
+  // Aquí también enviamos solo el token limpio
+  if (token) headers['Authorization'] = token;
+
+  const response = await fetch(`${API_URL}/me/photo`, {
+    method: 'PUT',
+    headers: headers,
+    body: formData
+  });
+
+  if (!response.ok) throw new Error('Error al subir la imagen');
+  return response.json();
+}
+export async function searchUsers(query) {
+  // GET /users?q=nombre
+  // encodeURIComponent asegura que espacios y acentos viajen bien en la URL
+  const queryString = query ? `?q=${encodeURIComponent(query)}` : '';
+  return request(`/users${queryString}`);
 }

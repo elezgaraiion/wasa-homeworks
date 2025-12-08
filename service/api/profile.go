@@ -11,28 +11,27 @@ import (
 )
 
 func (rt *_router) doGetCurrentUser(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		w.Header().Set("Content-Type", "application/json")
+    // CAMBIO: Leemos el header directamente, sin buscar "Bearer"
+    userID := r.Header.Get("Authorization")
+    
+    if userID == "" {
+        w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})		
-		return
-	}
+        json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})       
+        return
+    }
 
-	parts := strings.Fields(authHeader)
-	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-		http.Error(w, "invalid authorization header", http.StatusUnauthorized)
-		return
-	}
-	userID := parts[1]
+    // Ya no hacemos split ni comprobamos "Bearer" porque el frontend ya no lo manda.
+    // Usamos userID directamente.
 
-	user, err := rt.db.GetUserByID(userID)
-	if err != nil {
-		http.Error(w, "user not found", http.StatusUnauthorized)
-		return
-	}
+    user, err := rt.db.GetUserByID(userID)
+    if err != nil {
+        http.Error(w, "user not found", http.StatusUnauthorized)
+        return
+    }
 
-	json.NewEncoder(w).Encode(user)
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(user)
 }
 
 func (rt *_router) updateMyUserName(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {

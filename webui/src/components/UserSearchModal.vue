@@ -3,7 +3,7 @@
     <div class="search-card">
       
       <div class="card-header">
-        <h2>Nuevo Mensaje</h2>
+        <h2>Nuevo Chat</h2>
         <button class="btn-close" @click="$emit('close')">✕</button>
       </div>
 
@@ -13,7 +13,7 @@
           ref="inputRef"
           v-model="query" 
           type="text" 
-          placeholder="Buscar usuarios..." 
+          placeholder="Busca un usuario..." 
           class="modern-input"
         />
       </div>
@@ -22,7 +22,7 @@
         <div v-if="loading" class="status-msg">Buscando...</div>
         
         <div v-else-if="users.length === 0" class="status-msg">
-          {{ query ? 'No se encontraron usuarios' : 'Escribe para buscar...' }}
+          {{ query ? 'No hay resultados' : 'Escribe un nombre...' }}
         </div>
 
         <div 
@@ -53,6 +53,7 @@ const users = ref([]);
 const loading = ref(false);
 const inputRef = ref(null);
 
+// Enfocar automáticamente al abrir
 onMounted(() => {
   nextTick(() => inputRef.value?.focus());
 });
@@ -62,6 +63,7 @@ watch(query, async (newVal) => {
     users.value = [];
     return;
   }
+  
   loading.value = true;
   try {
     users.value = await searchUsers(newVal);
@@ -74,33 +76,73 @@ watch(query, async (newVal) => {
 </script>
 
 <style scoped>
-/* ESTE Z-INDEX DEBE SER MUY ALTO */
+/* FONDO BORROSO (GLASSMORPHISM) */
 .modal-backdrop {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-  background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);
-  z-index: 9999; /* <--- MUY IMPORTANTE */
-  display: flex; justify-content: center; padding-top: 50px;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(5px); /* Desenfoque elegante */
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 60px; /* Un poco separado del techo */
   animation: fadeIn 0.2s ease;
 }
 
+/* TARJETA FLOTANTE */
 .search-card {
-  width: 400px; max-width: 90%; background: #111b21; border: 1px solid #333;
-  border-radius: 12px; display: flex; flex-direction: column;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.5); overflow: hidden; max-height: 80vh;
+  width: 400px;
+  max-width: 90%;
+  background-color: #111b21;
+  border: 1px solid #333;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
   animation: slideDown 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+  overflow: hidden;
+  max-height: 80vh;
 }
 
-.card-header { padding: 15px; background: #202c33; display: flex; justify-content: space-between; align-items: center; color: white;}
-.btn-close { background: none; border: none; color: #aaa; font-size: 1.2rem; cursor: pointer; }
-.search-input-container { padding: 10px; border-bottom: 1px solid #333; display: flex; align-items: center; background: #111b21;}
-.search-icon { margin-right: 10px; color: #888; }
-.modern-input { width: 100%; background: transparent; border: none; color: white; outline: none; }
-.users-list-wrapper { flex: 1; overflow-y: auto; min-height: 100px; }
-.status-msg { padding: 20px; text-align: center; color: #888; }
-.user-row { display: flex; align-items: center; padding: 10px 15px; border-bottom: 1px solid #222; }
-.user-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; background: #ddd; }
-.user-name { color: white; }
+.card-header {
+  padding: 15px 20px;
+  background-color: #202c33;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #2f3b43;
+}
+
+.card-header h2 { margin: 0; font-size: 1.1rem; color: #e9edef; font-weight: 600; }
+.btn-close { background: none; border: none; color: #aebac1; font-size: 1.2rem; cursor: pointer; }
+.btn-close:hover { color: #f15c6d; }
+
+.search-input-container {
+  padding: 12px 20px;
+  border-bottom: 1px solid #2f3b43;
+  display: flex;
+  align-items: center;
+  background: #111b21;
+}
+.search-icon { margin-right: 10px; color: #8696a0; }
+.modern-input { width: 100%; background: transparent; border: none; color: #e9edef; font-size: 1rem; outline: none; }
+
+.users-list-wrapper { flex: 1; overflow-y: auto; min-height: 150px; }
+.status-msg { padding: 30px; text-align: center; color: #8696a0; font-size: 0.9rem; }
+
+.user-row {
+  display: flex; align-items: center; padding: 12px 20px;
+  border-bottom: 1px solid #222; cursor: default;
+}
+.user-row:hover { background-color: #202c33; }
+
+.user-avatar { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; margin-right: 15px; background-color: #dfe5e7; }
+.user-name { color: #e9edef; font-weight: 500; }
+
+.users-list-wrapper::-webkit-scrollbar { width: 5px; }
+.users-list-wrapper::-webkit-scrollbar-thumb { background-color: #374045; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideDown { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>

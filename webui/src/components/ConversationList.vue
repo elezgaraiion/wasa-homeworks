@@ -15,24 +15,14 @@
       </div>
 
       <div class="header-actions">
-        <div class="icon group-add-icon" title="Crear grupo">
-           <svg viewBox="0 0 24 24" width="24" height="24" class="">
-            <path fill="currentColor" d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path>
-          </svg>
-        </div>
         <span class="icon logout-btn" @click.stop="handleLogout" title="Cerrar Sesión">🚪</span>
       </div>
     </header>
 
     <div class="search-bar">
-      <div class="search-input-wrapper" @click="openSearch">
+      <div class="search-input-wrapper" @click="showSearchModal = true">
         <span class="search-icon">🔍</span>
-        <input 
-          type="text" 
-          placeholder="Buscar o empezar un nuevo chat" 
-          readonly 
-          class="fake-input"
-        />
+        <span class="fake-input-text">Buscar o empezar nuevo chat</span>
       </div>
     </div>
 
@@ -41,8 +31,7 @@
       
       <div v-else-if="conversations.length === 0" class="state-msg">
         <p>No tienes conversaciones.</p>
-        <button class="btn-new" @click="openSearch">Buscar gente</button>
-      </div>
+        </div>
 
       <div 
         v-else 
@@ -69,10 +58,12 @@
       </div>
     </div>
 
-    <UserSearchModal 
-      v-if="showSearchModal" 
-      @close="showSearchModal = false" 
-    />
+    <Teleport to="body">
+      <UserSearchModal 
+        v-if="showSearchModal" 
+        @close="showSearchModal = false" 
+      />
+    </Teleport>
 
   </div>
 </template>
@@ -81,7 +72,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { getConversations } from '../services/api'; 
 import { store } from '../store.js'; 
-import UserSearchModal from './UserSearchModal.vue'; // <--- VERIFICA QUE ESTE ARCHIVO EXISTE
+import UserSearchModal from './UserSearchModal.vue'; 
 
 const DEFAULT_AVATAR = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
 
@@ -91,14 +82,9 @@ const emit = defineEmits(['chatSelected', 'openProfile']);
 const conversations = ref([]);
 const loading = ref(true);
 const selectedChatId = ref(null);
-const showSearchModal = ref(false); // <--- Variable que abre el modal
+const showSearchModal = ref(false); // Controla el modal
 
-// FUNCIÓN PARA ABRIR (CON LOG DE DEPURACIÓN)
-function openSearch() {
-  console.log("¡Click detectado! Abriendo modal..."); 
-  showSearchModal.value = true;
-}
-
+// COMPUTADOS
 const userName = computed(() => {
   const u = store.currentUser;
   return u?.name || u?.Name || 'Usuario';
@@ -123,9 +109,12 @@ function handleLogout() {
 onMounted(async () => {
   try {
     loading.value = true;
-    conversations.value = await getConversations();
+    const res = await getConversations();
+    // Protección contra null
+    conversations.value = res || [];
   } catch (error) {
     console.error("Error chats:", error);
+    conversations.value = [];
   } finally {
     loading.value = false;
   }
@@ -145,50 +134,33 @@ function selectChat(id) {
 .sidebar-header { height: 60px; background-color: #202c33; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 
 /* PERFIL */
-.user-profile-section { display: flex; align-items: center; cursor: pointer; padding: 5px; border-radius: 8px; max-width: 65%; transition: 0.2s; }
+.user-profile-section { display: flex; align-items: center; cursor: pointer; padding: 5px; border-radius: 8px; max-width: 80%; transition: 0.2s; }
 .user-profile-section:hover { background-color: #2a3942; }
 .user-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; background-color: #dfe5e7; }
 .my-name { font-weight: 600; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ICONOS */
-.header-actions { display: flex; gap: 20px; align-items: center; }
-.icon { color: #aebac1; font-size: 1.4rem; cursor: pointer; display: flex; align-items: center; }
+.header-actions { display: flex; gap: 15px; align-items: center; }
+.icon { color: #aebac1; font-size: 1.4rem; cursor: pointer; }
 .icon:hover { color: #fff; }
 .logout-btn:hover { color: #f15c6d; }
 
-/* BARRA DE BÚSQUEDA (ARREGLADA) */
+/* BARRA DE BÚSQUEDA */
 .search-bar { padding: 8px 12px; border-bottom: 1px solid #202c33; }
-
 .search-input-wrapper { 
-  background-color: #202c33; 
-  border-radius: 8px; 
-  padding: 6px 12px; 
-  display: flex; 
-  align-items: center; 
-  cursor: pointer; /* Mano al pasar ratón */
-  transition: background 0.2s;
+  background-color: #202c33; border-radius: 8px; padding: 8px 12px; 
+  display: flex; align-items: center; cursor: pointer; transition: background 0.2s;
 }
 .search-input-wrapper:hover { background-color: #2a3942; }
 
-.search-icon { margin-right: 10px; color: #8696a0; }
+.search-icon { margin-right: 10px; color: #8696a0; font-size: 0.9rem; }
+.fake-input-text { color: #8696a0; font-size: 0.95rem; user-select: none; }
 
-/* INPUT "FALSO" QUE DEJA PASAR EL CLICK */
-.fake-input { 
-  background: transparent; 
-  border: none; 
-  color: #d1d7db; 
-  width: 100%; 
-  outline: none; 
-  cursor: pointer; 
-  pointer-events: none; /* <--- TRUCO: El click pasa al div padre */
-}
-
-/* LISTA */
+/* LISTA DE CHATS */
 .chats-container { flex: 1; overflow-y: auto; }
 .state-msg { padding: 20px; text-align: center; color: #888; }
-.btn-new { background: #00a884; border: none; padding: 8px 16px; border-radius: 4px; color: #111; cursor: pointer; font-weight: bold; margin-top: 10px; }
 
-/* ITEMS CHAT */
+/* ITEMS */
 .chat-item { display: flex; align-items: center; padding: 0 15px; height: 72px; cursor: pointer; border-bottom: 1px solid #222; }
 .chat-item:hover { background-color: #202c33; }
 .chat-item.active { background-color: #2a3942; }

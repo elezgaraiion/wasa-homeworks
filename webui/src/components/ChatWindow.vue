@@ -19,7 +19,7 @@
 
     <div class="messages-area" ref="messagesContainer">
       
-      <div v-if="loading" class="loading-msgs">
+      <div v-if="loading && messages.length === 0" class="loading-msgs">
         <div class="spinner-small"></div>
       </div>
       
@@ -46,7 +46,9 @@
 
           <div class="message-meta">
             <span class="message-time">{{ formatTime(msg.createdAt || msg.CreatedAt) }}</span>
-            <span v-if="isMe(msg)" class="check-icon">✓✓</span>
+            <span v-if="isMe(msg)" class="check-icon">
+               <span :style="{ color: (msg.status === 'read' || msg.Status === 'read') ? '#53bdeb' : 'inherit' }">✓✓</span>
+            </span>
           </div>
 
         </div>
@@ -55,24 +57,35 @@
 
     <footer class="chat-footer">
       <div class="input-wrapper">
-        <input v-model="newMessage" @keyup.enter="handleSend" type="text" placeholder="Escribe un mensaje..." />
+        <input 
+            v-model="newMessage" 
+            @keyup.enter="handleSend" 
+            type="text" 
+            placeholder="Escribe un mensaje..." 
+            :disabled="sending"
+            ref="inputRef"
+        />
       </div>
-      <span class="footer-icon send-btn" @click="handleSend">➤</span>
+      <span class="footer-icon send-btn" @click="handleSend" :class="{ 'disabled': !newMessage.trim() }">➤</span>
     </footer>
 
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue';
-import { getConversationMessages } from '../services/api';
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+// IMPORTAMOS LA FUNCIÓN DE API
+import { getConversationMessages, sendMessage } from '../services/api';
 import { store } from '../store.js';
 
 const props = defineProps(['chat']); 
 const messages = ref([]);
 const loading = ref(false);
+const sending = ref(false);
 const newMessage = ref('');
 const messagesContainer = ref(null);
+const inputRef = ref(null);
+let pollInterval = null;
 
 function isMe(msg) {
   const myId = store.currentUser?.id || localStorage.getItem('userId');
@@ -87,43 +100,101 @@ function shouldShowSenderName(msg) {
 function formatTime(dateStr) {
   if (!dateStr) return '';
   const safeDate = dateStr.replace(' ', 'T');
-  const date = new Date(safeDate.includes('Z') ? safeDate : safeDate + 'Z');
+  let date = new Date(safeDate.includes('Z') ? safeDate : safeDate + 'Z');
+  if (isNaN(date.getTime())) date = new Date(safeDate); 
   if (isNaN(date.getTime())) return '';
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-async function loadMessages() {
+async function loadMessages(isBackgroundUpdate = false) {
   if (!props.chat?.id) return;
-  loading.value = true;
+  
+  // Solo mostramos loading si no hay mensajes (primera carga)
+  if (!isBackgroundUpdate && messages.length === 0) loading.value = true;
+  
   try {
     const res = await getConversationMessages(props.chat.id);
     const list = res || [];
-    // Invertimos el orden para ver los nuevos abajo
-    messages.value = list.reverse();
-    scrollToBottom();
+    // Invertimos porque la API suele devolver del más nuevo al más viejo
+    // y en el chat queremos los viejos arriba y los nuevos abajo
+    const orderedList = list.reverse();
+
+    // Solo hacemos scroll si han llegado mensajes nuevos
+    const shouldScroll = messages.value.length !== orderedList.length;
+    
+    messages.value = orderedList;
+    
+    if (shouldScroll) scrollToBottom();
+
   } catch (e) {
-    // Silencioso en producción, descomentar si hay problemas
     // console.error(e);
   } finally {
     loading.value = false;
   }
 }
 
-function handleSend() {
-  if (!newMessage.value.trim()) return;
-  // Aquí iría la llamada a la API para enviar mensaje (sendMessage)
-  // Por ahora solo limpiamos el input visualmente
+// --- FUNCIÓN DE ENVIAR ---
+async function handleSend() {
+  const text = newMessage.value.trim();
+  if (!text) return;
+
+  // 1. Limpieza visual inmediata (UX rápida)
   newMessage.value = '';
+  sending.value = true;
+
+  try {
+    // 2. Llamada a la API
+    const sentMsg = await sendMessage(props.chat.id, text);
+
+    // 3. Añadir a la lista localmente (para no esperar al polling)
+    // El backend nos devuelve el mensaje creado, lo metemos al array
+    if (sentMsg) {
+        messages.value.push(sentMsg);
+        scrollToBottom();
+    } else {
+        // Fallback por si acaso
+        await loadMessages(true);
+    }
+
+    // Enfocar de nuevo el input
+    nextTick(() => inputRef.value?.focus());
+
+  } catch (e) {
+    console.error("Error envío:", e);
+    alert("No se pudo enviar");
+    newMessage.value = text; // Restaurar texto si falló
+  } finally {
+    sending.value = false;
+  }
 }
 
 function scrollToBottom() {
   nextTick(() => {
-    if (messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+    if (messagesContainer.value) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+    }
   });
 }
 
-onMounted(loadMessages);
-watch(() => props.chat.id, loadMessages);
+// CICLO DE VIDA
+onMounted(() => {
+  loadMessages();
+  // Focusear el input al entrar
+  nextTick(() => inputRef.value?.focus());
+  // Polling cada 3 segundos para ver mensajes nuevos
+  pollInterval = setInterval(() => loadMessages(true), 3000);
+});
+
+onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval);
+});
+
+// Si cambiamos de chat sin desmontar el componente
+watch(() => props.chat.id, () => {
+  messages.value = [];
+  loadMessages();
+  nextTick(() => inputRef.value?.focus());
+});
 </script>
 
 <style scoped>
@@ -160,20 +231,21 @@ watch(() => props.chat.id, loadMessages);
 .message-bubble { max-width: 65%; padding: 6px 9px; border-radius: 8px; background-color: #202c33; color: white; border-top-left-radius: 0; position: relative; box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); }
 .my-message .message-bubble { background-color: #005c4b; border-top-left-radius: 8px; border-top-right-radius: 0; }
 
-.sender-name { font-size: 0.75rem; color: #d65c3e; font-weight: bold; margin-bottom: 4px; }
+.sender-name { font-size: 0.8rem; color: #d65c3e; font-weight: 500; margin-bottom: 2px; line-height: 1.2; }
 .message-content { font-size: 0.9rem; line-height: 1.3; }
 .message-image { max-width: 100%; border-radius: 6px; margin-bottom: 4px; display: block; }
 .caption-text { margin: 4px 0 0 0; }
 
-.message-meta { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 2px; margin-left: 10px; float: right; }
+.message-meta { float: right; margin-left: 8px; margin-top: 4px; display: flex; align-items: center; gap: 3px; position: relative; top: 4px; }
 .message-time { font-size: 0.65rem; color: rgba(255,255,255,0.6); }
-.check-icon { font-size: 0.7rem; color: #53bdeb; }
+.check-icon { font-size: 0.75rem; color: #8696a0; }
 
 .chat-footer { height: 60px; background-color: #202c33; display: flex; align-items: center; padding: 0 16px; }
 .input-wrapper { flex: 1; background: #2a3942; border-radius: 8px; padding: 9px 12px; margin-right: 10px; }
 .input-wrapper input { background: transparent; border: none; color: white; width: 100%; outline: none; font-size: 1rem; }
 .send-btn { color: #8696a0; font-size: 1.5rem; cursor: pointer; transition: color 0.2s; }
 .send-btn:hover { color: #00a884; }
+.send-btn.disabled { color: #444; cursor: default; }
 
 @keyframes spin { 100% { transform: rotate(360deg); } }
 </style>

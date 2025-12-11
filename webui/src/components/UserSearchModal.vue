@@ -46,7 +46,7 @@
       v-if="selectedUser" 
       :user="selectedUser"
       @close="selectedUser = null"
-      @startChat="initiateChat"
+      @chatStarted="handleChatStarted" 
     />
 
   </div>
@@ -55,16 +55,16 @@
 <script setup>
 import { ref, watch, onMounted, nextTick } from 'vue';
 import { searchUsers } from '../services/api';
-// IMPORTAMOS EL NUEVO COMPONENTE
 import UserProfileReadOnly from './UserProfileReadOnly.vue';
 
-const emit = defineEmits(['close']); // Puedes añadir evento para crear chat
+// AÑADIMOS 'chatStarted' A LOS EVENTOS QUE PODEMOS EMITIR
+const emit = defineEmits(['close', 'chatStarted']); 
 
 const query = ref('');
 const users = ref([]);
 const loading = ref(false);
 const inputRef = ref(null);
-const selectedUser = ref(null); // Aquí guardamos al usuario que estamos mirando
+const selectedUser = ref(null);
 
 onMounted(() => {
   nextTick(() => inputRef.value?.focus());
@@ -89,18 +89,18 @@ function inspectUser(user) {
   selectedUser.value = user;
 }
 
-function initiateChat(user) {
-  // AQUÍ ES DONDE LLAMAREMOS A LA API PARA CREAR CHAT
-  alert(`Creando chat con ${user.name}... (Próximamente)`);
+// NUEVA FUNCIÓN: Recibe el chat creado por el hijo y lo manda al padre (ConversationList)
+function handleChatStarted(chat) {
+  // 1. Pasamos el chat a ConversationList
+  emit('chatStarted', chat);
   
-  // Cerramos el perfil y podríamos cerrar el buscador también
-  selectedUser.value = null;
-  // emit('close'); // Descomentar si quieres que se cierre todo al darle a chatear
+  // 2. Cerramos el buscador entero porque ya vamos al chat
+  emit('close'); 
 }
 </script>
 
 <style scoped>
-/* ... (LOS MISMOS ESTILOS DE ANTES, SIN CAMBIOS) ... */
+/* TUS ESTILOS SE MANTIENEN IGUAL */
 .modal-backdrop {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);
@@ -130,7 +130,7 @@ function initiateChat(user) {
 .status-msg { padding: 30px; text-align: center; color: #8696a0; font-size: 0.9rem; }
 .user-row {
   display: flex; align-items: center; padding: 12px 20px;
-  border-bottom: 1px solid #222; cursor: pointer; /* AHORA ES PUNTERO PORQUE ES CLICKABLE */
+  border-bottom: 1px solid #222; cursor: pointer;
 }
 .user-row:hover { background-color: #202c33; }
 .user-avatar { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; margin-right: 15px; background-color: #dfe5e7; }

@@ -99,6 +99,24 @@ func (rt *_router) listConversationMessages(w http.ResponseWriter, r *http.Reque
     w.WriteHeader(200)
     json.NewEncoder(w).Encode(msgs)
 }
+func (rt *_router) createPrivateConversation(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+    userID := r.Header.Get("Authorization")
+    
+    // Leer el JSON { "targetUserId": "..." }
+    var body struct {
+        TargetUserID string `json:"targetUserId"`
+    }
+    json.NewDecoder(r.Body).Decode(&body)
+
+    // LLAMADA MÁGICA: Si existe lo devuelve, si no lo crea
+    conv, err := rt.db.GetOrCreateOneOnOneConversation(userID, body.TargetUserID)
+    if err != nil {
+        http.Error(w, "Error", 500)
+        return
+    }
+
+    json.NewEncoder(w).Encode(conv)
+}
 func (rt *_router) sendMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	userID := r.Header.Get("Authorization")
 	if userID == "" {

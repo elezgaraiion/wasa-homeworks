@@ -85,3 +85,16 @@ export async function getConversationMessages(conversationId) {
   // Así el navegador cree que es una petición nueva y no usa la memoria caché (304)
   return request(`/conversations/${conversationId}/messages?limit=50&_t=${Date.now()}`);
 }
+export async function createPrivateChat(targetUserId) {
+  // Cambiamos la URL para coincidir con el backend
+  return request('/chats', {
+    method: 'POST',
+    body: JSON.stringify({ targetUserId })
+  });
+}
+export async function sendMessage(conversationId, text) {
+  return request(`/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ text: text })
+  });
+}

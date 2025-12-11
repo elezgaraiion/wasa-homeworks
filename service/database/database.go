@@ -20,6 +20,7 @@ type AppDatabase interface {
     GetConversationProfile(userID, convID string) (models.Conversation, error)
     MarkConversationSeen(userID, convID string) error
     GetMessagesInConversation(userID string,convID string,limit int,before string) ([]models.Message, error)
+    GetOrCreateOneOnOneConversation(myID, targetUserID string) (models.Conversation, error)
     SendMessage(senderID, convID, text, photoURL, replyToMessageID string) (models.Message, error)
     GetMessageByID(userID, convID, messageID string) (models.Message, error)
     ForwardMessage(userID, sourceConvID, messageID, targetConvID string) (models.Message, error)

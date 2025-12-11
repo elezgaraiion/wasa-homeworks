@@ -21,7 +21,7 @@
     </div>
 
     <div class="chats-container">
-      <div v-if="loading" class="state-msg">Cargando...</div>
+      <div v-if="loading && conversations.length === 0" class="state-msg">Cargando...</div>
       
       <div v-else-if="conversations.length === 0" class="state-msg">
         <p>No tienes conversaciones.</p>
@@ -67,14 +67,18 @@
     </div>
 
     <Teleport to="body">
-      <UserSearchModal v-if="showSearchModal" @close="showSearchModal = false" />
+      <UserSearchModal 
+        v-if="showSearchModal" 
+        @close="showSearchModal = false"
+        @chatStarted="onChatCreated" 
+      />
     </Teleport>
 
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { getConversations } from '../services/api'; 
 import { store } from '../store.js'; 
 import UserSearchModal from './UserSearchModal.vue'; 
@@ -86,16 +90,15 @@ const conversations = ref([]);
 const loading = ref(true);
 const selectedChatId = ref(null);
 const showSearchModal = ref(false);
+let refreshInterval = null;
 
 const userName = computed(() => store.currentUser?.name || store.currentUser?.Name || 'Usuario');
 const avatarUrl = computed(() => store.currentUser?.photo || store.currentUser?.Photo || DEFAULT_AVATAR);
 
 function handleImageError(e) { e.target.src = DEFAULT_AVATAR; }
 
-// Función auxiliar para saber si el último mensaje lo envié yo
 function isMe(chat) {
   const myId = store.currentUser?.id || localStorage.getItem('userId');
-  // Comparamos con la propiedad nueva que viene del backend
   return chat.lastMessageSenderId === myId;
 }
 
@@ -103,16 +106,10 @@ function formatTime(dateStr) {
   if (!dateStr || dateStr === '' || dateStr.startsWith('0001')) return '';
   const safeDateStr = dateStr.replace(' ', 'T');
   let date = new Date(safeDateStr);
-  if (isNaN(date.getTime())) {
-     date = new Date(safeDateStr + 'Z');
-  }
+  if (isNaN(date.getTime())) date = new Date(safeDateStr + 'Z');
   if (isNaN(date.getTime())) return '';
-
   const now = new Date();
-  const isToday = date.getDate() === now.getDate() &&
-                  date.getMonth() === now.getMonth() &&
-                  date.getFullYear() === now.getFullYear();
-
+  const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
   return isToday 
     ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
@@ -122,26 +119,58 @@ function handleLogout() {
   if (confirm('¿Cerrar sesión?')) store.logout();
 }
 
-onMounted(async () => {
+async function loadConversations() {
   try {
-    loading.value = true;
     const res = await getConversations();
+    // Actualizamos la lista, pero mantenemos la selección si existe
     conversations.value = res || [];
   } catch (error) {
     console.error("Error chats:", error);
-    conversations.value = [];
   } finally {
     loading.value = false;
   }
-});
+}
+
+// --- FUNCIÓN CLAVE PARA QUE FUNCIONE AL INSTANTE ---
+async function onChatCreated(chat) {
+  // 1. Cerramos el modal (ya se encarga el componente hijo, pero aseguramos)
+  showSearchModal.value = false;
+
+  // 2. ¿Ya existe este chat en la lista?
+  const existing = conversations.value.find(c => c.id === chat.id);
+  
+  if (!existing) {
+    // Si es nuevo, lo metemos ARRIBA del todo manualmente para verlo YA
+    conversations.value.unshift(chat);
+  }
+
+  // 3. Lo seleccionamos inmediatamente
+  selectChat(chat);
+
+  // 4. (Opcional) Recargamos la lista del servidor por si acaso faltan datos
+  await loadConversations();
+}
 
 function selectChat(chat) {
   selectedChatId.value = chat.id;
   emit('chatSelected', chat);
 }
+
+// POLLING: Recargar cada 4 segundos para que le salga al OTRO usuario
+onMounted(() => {
+  loadConversations();
+  refreshInterval = setInterval(loadConversations, 4000);
+});
+
+onUnmounted(() => {
+  if (refreshInterval) clearInterval(refreshInterval);
+});
+
+defineExpose({ refreshList: loadConversations });
 </script>
 
 <style scoped>
+/* TUS ESTILOS IGUALES QUE ANTES */
 .sidebar { display: flex; flex-direction: column; height: 100%; background-color: #111b21; border-right: 1px solid #2f3b43; color: #e9edef; position: relative; }
 .sidebar-header { height: 60px; background-color: #202c33; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .user-profile-section { display: flex; align-items: center; cursor: pointer; padding: 5px; border-radius: 8px; max-width: 80%; transition: 0.2s; }
@@ -159,7 +188,6 @@ function selectChat(chat) {
 .fake-input-text { color: #8696a0; font-size: 0.95rem; user-select: none; }
 .chats-container { flex: 1; overflow-y: auto; }
 .state-msg { padding: 20px; text-align: center; color: #888; }
-
 .chat-item { display: flex; align-items: center; padding: 0 15px; height: 72px; cursor: pointer; border-bottom: 1px solid #222; }
 .chat-item:hover { background-color: #202c33; }
 .chat-item.active { background-color: #2a3942; }
@@ -169,39 +197,10 @@ function selectChat(chat) {
 .chat-name { font-weight: 500; font-size: 17px; color: #e9edef; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px; }
 .chat-time { font-size: 12px; color: #8696a0; white-space: nowrap; flex-shrink: 0; }
 .chat-bottom { display: flex; width: 100%; }
-
-/* NUEVOS ESTILOS PARA LA PREVISUALIZACIÓN */
-.preview-wrapper { 
-  display: flex; 
-  align-items: center; 
-  width: 100%; 
-  overflow: hidden; 
-  font-size: 14px;
-  color: #8696a0;
-}
-
-.status-icon { 
-  margin-right: 3px; 
-  font-size: 0.8rem; /* Tamaño del tick */
-  min-width: 16px; 
-  display: flex;
-  align-items: center;
-}
-
-.sender-prefix { 
-  margin-right: 4px; 
-  color: #e9edef; /* Blanco suave para el nombre */
-  font-weight: 500; 
-  white-space: nowrap;
-}
-
-.chat-preview-text { 
-  white-space: nowrap; 
-  overflow: hidden; 
-  text-overflow: ellipsis; 
-  flex: 1; 
-}
-
+.preview-wrapper { display: flex; align-items: center; width: 100%; overflow: hidden; font-size: 14px; color: #8696a0; }
+.status-icon { margin-right: 3px; font-size: 0.8rem; min-width: 16px; display: flex; align-items: center; }
+.sender-prefix { margin-right: 4px; color: #e9edef; font-weight: 500; white-space: nowrap; }
+.chat-preview-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 .chats-container::-webkit-scrollbar { width: 5px; }
 .chats-container::-webkit-scrollbar-thumb { background-color: #374045; }
 </style>

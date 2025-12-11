@@ -8,102 +8,115 @@ import (
 )
 
 func (db *appdbimpl) GetMessagesInConversation(
-    userID string,
-    convID string,
-    limit int,
-    before string,
+	userID string,
+	convID string,
+	limit int,
+	before string,
 ) ([]models.Message, error) {
 
-    // 1. Validar acceso
-    var count int
-    err := db.c.QueryRow(`
-        SELECT COUNT(*)
-        FROM conversation_participants
-        WHERE conversation_id = ? AND user_id = ?
-    `, convID, userID).Scan(&count)
+	// 1. Validar si el usuario pertenece a la conversación
+	var count int
+	err := db.c.QueryRow(`
+		SELECT COUNT(*)
+		FROM conversation_participants
+		WHERE conversation_id = ? AND user_id = ?
+	`, convID, userID).Scan(&count)
 
-    if err != nil {
-        return nil, err
-    }
-    if count == 0 {
-        return nil, models.ErrForbidden
-    }
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nil, models.ErrForbidden
+	}
 
-    // 2. Consultar tipo
-    var convType string
-    err = db.c.QueryRow(`
-        SELECT type FROM conversations WHERE id = ?
-    `, convID).Scan(&convType)
+	// 2. Query Principal
+	query := `
+		SELECT 
+			m.id,
+			m.sender_id,
+			u.name,
+			u.photo,
+			m.conversation_id,
+			m.text,
+			m.photo,
+			m.reply_to_message_id,
+			m.created_at
+		FROM messages m
+		JOIN users u ON u.id = m.sender_id
+		WHERE m.conversation_id = ?
+	`
+	args := []any{convID}
 
-    if err == sql.ErrNoRows {
-        return nil, models.ErrConversationNotFound
-    }
-    if err != nil {
-        return nil, err
-    }
+	if before != "" {
+		query += " AND m.created_at < ?"
+		args = append(args, before)
+	}
 
-    // 3. Query real
-    query := `
-        SELECT 
-            m.id,
-            m.sender_id,
-            u.name,
-            u.photo,
-            m.conversation_id,
-            m.text,
-            m.photo,
-            m.reply_to_message_id,
-            m.created_at
-        FROM messages m
-        JOIN users u ON u.id = m.sender_id
-        WHERE m.conversation_id = ?
-    `
-    args := []any{convID}
+	// Ordenamos por fecha DESC para paginación
+	query += " ORDER BY m.created_at DESC LIMIT ?"
+	args = append(args, limit)
 
-    // 4. Before
-    if before != "" {
-        query += " AND m.created_at < ?"
-        args = append(args, before)
-    }
+	rows, err := db.c.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    query += " ORDER BY m.created_at DESC LIMIT ?"
-    args = append(args, limit)
+	msgs := []models.Message{}
+	
+	const layoutSQLite = "2006-01-02 15:04:05"
 
-    rows, err := db.c.Query(query, args...)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	for rows.Next() {
+		var m models.Message
+		
+		// --- VARIABLES TEMPORALES PARA NULLS ---
+		var senderPhoto sql.NullString // <--- NUEVO: Para evitar el crash
+		var txt sql.NullString
+		var photo sql.NullString
+		var replyTo sql.NullString
+		var createdAtStr string 
 
-    msgs := []models.Message{}
+		err = rows.Scan(
+			&m.ID,
+			&m.Sender.ID,
+			&m.Sender.Name,
+			&senderPhoto, // <--- CORREGIDO: Usamos la variable NullString
+			&m.ConversationID,
+			&txt,       
+			&photo,     
+			&replyTo,   
+			&createdAtStr, 
+		)
+		if err != nil {
+			return nil, err
+		}
 
-    for rows.Next() {
-        var m models.Message
+		// ASIGNACIONES SEGURAS
+		if senderPhoto.Valid { m.Sender.Photo = senderPhoto.String } // <--- Pasamos el valor al struct
+		if txt.Valid { m.Text = txt.String }
+		if photo.Valid { m.Photo = photo.String }
+		if replyTo.Valid { m.ReplyToMessageID = replyTo.String }
 
-        err = rows.Scan(
-            &m.ID,
-            &m.Sender.ID,
-            &m.Sender.Name,
-            &m.Sender.Photo,
-            &m.ConversationID,
-            &m.Text,
-            &m.Photo,
-            &m.ReplyToMessageID,
-            &m.CreatedAt,
-        )
-        if err != nil {
-            return nil, err
-        }
+		// PARSEAR FECHA
+		t, err := time.Parse(layoutSQLite, createdAtStr)
+		if err != nil {
+			t, _ = time.Parse(time.RFC3339, createdAtStr)
+		}
+		m.CreatedAt = t
 
-        // Reacciones
-        m.Reactions, _ = db.GetReactions(m.ID)
+		// Cargar Reacciones (si tienes la función implementada)
+		reactions, _ := db.GetReactions(m.ID)
+		m.Reactions = reactions
 
-        msgs = append(msgs, m)
-    }
+		msgs = append(msgs, m)
+	}
 
-    db.applySeenStatus(convID, userID, convType, msgs)
+	// IMPORTANTE: El frontend espera el array vacío [] en lugar de null si no hay mensajes
+	if msgs == nil {
+		msgs = []models.Message{}
+	}
 
-    return msgs, nil
+	return msgs, nil
 }
 func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
 

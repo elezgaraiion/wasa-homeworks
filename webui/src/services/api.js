@@ -78,3 +78,10 @@ export async function searchUsers(query) {
   const queryString = query ? `?q=${encodeURIComponent(query)}` : '';
   return request(`/users${queryString}`);
 }
+// En src/services/api.js
+
+export async function getConversationMessages(conversationId) {
+  // El truco es añadir ?_t=AHORA_MISMO
+  // Así el navegador cree que es una petición nueva y no usa la memoria caché (304)
+  return request(`/conversations/${conversationId}/messages?limit=50&_t=${Date.now()}`);
+}

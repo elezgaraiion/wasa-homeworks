@@ -1,129 +1,131 @@
 package database
 
 import (
-	"sort"
 	"time"
+    "sort"
 	"database/sql"
 	"github.com/aritz/wasa-homeworks/service/models"
 )
 
 func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, error) {
-    // MODIFICAMOS LA QUERY:
-    // Hacemos JOIN con 'messages' (m) coincidiendo con la fecha del último mensaje
-    // Hacemos JOIN con 'users' (u_sender) para saber el nombre del que lo envió
-    query := `
-        SELECT 
-            c.id, c.type, c.name, c.photo,
-            c.last_message_preview, c.last_message_at,
-            meta.joined_at,
-            -- Extraemos datos del mensaje real
-            COALESCE(msg.sender_id, ''),
-            COALESCE(msg.status, ''),
-            COALESCE(u_sender.name, '')
-        FROM conversations c
-        JOIN conversation_participants p ON p.conversation_id = c.id
-        LEFT JOIN conversation_user_meta meta ON meta.conversation_id = c.id AND meta.user_id = ?
-        
-        -- BUSCAMOS EL ÚLTIMO MENSAJE REAL
-        LEFT JOIN messages msg ON msg.conversation_id = c.id AND msg.created_at = c.last_message_at
-        
-        -- BUSCAMOS EL NOMBRE DEL QUE LO ENVIÓ
-        LEFT JOIN users u_sender ON u_sender.id = msg.sender_id
-        
-        WHERE p.user_id = ?
-    `
+	// Query mejorada que trae todo lo necesario
+	query := `
+		SELECT 
+			c.id, c.type, c.name, c.photo,
+			c.last_message_preview, c.last_message_at,
+			meta.joined_at,
+			COALESCE(msg.sender_id, ''),
+			COALESCE(msg.status, ''),
+			COALESCE(u_sender.name, ''),
+			(SELECT COUNT(*) 
+			 FROM messages m2 
+			 WHERE m2.conversation_id = c.id 
+			   AND m2.created_at > COALESCE(meta.last_seen_message_at, meta.joined_at)
+			   AND m2.sender_id != ?
+			) AS unread_count
+		FROM conversations c
+		JOIN conversation_participants p ON p.conversation_id = c.id
+		LEFT JOIN conversation_user_meta meta ON meta.conversation_id = c.id AND meta.user_id = ?
+		LEFT JOIN messages msg ON msg.conversation_id = c.id AND msg.created_at = c.last_message_at
+		LEFT JOIN users u_sender ON u_sender.id = msg.sender_id
+		WHERE p.user_id = ?
+	`
 
-    rows, err := db.c.Query(query, userID, userID)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	rows, err := db.c.Query(query, userID, userID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    var convs []models.Conversation
-    const layoutSQLite = "2006-01-02 15:04:05"
+	var convs []models.Conversation
 
-    for rows.Next() {
-        var conv models.Conversation
+	// Formatos de fecha posibles
+	const layoutSQLite = "2006-01-02 15:04:05"
 
-        // Variables temporales
-        var lastMsgAt sql.NullString
-        var joinedAt sql.NullString
-        var preview sql.NullString
-        var name sql.NullString
-        var photo sql.NullString
-        
-        // Variables nuevas
-        var senderID sql.NullString
-        var msgStatus sql.NullString
-        var senderName sql.NullString
+	for rows.Next() {
+		var c models.Conversation
+		
+		// Variables temporales para Scan (manejo de NULLs)
+		var lastMsgAtStr sql.NullString
+		var joinedAtStr sql.NullString
+		var preview sql.NullString
+		var name sql.NullString
+		var photo sql.NullString
+		var senderID sql.NullString
+		var msgStatus sql.NullString
+		var senderName sql.NullString
+		var unreadCount int
 
-        if err := rows.Scan(
-            &conv.ID,
-            &conv.Type,
-            &name,
-            &photo,
-            &preview,
-            &lastMsgAt,
-            &joinedAt,
-            &senderID,     // Nuevo
-            &msgStatus,    // Nuevo
-            &senderName,   // Nuevo
-        ); err != nil {
-            return nil, err
-        }
+		err = rows.Scan(
+			&c.ID, &c.Type, &name, &photo, &preview, &lastMsgAtStr, &joinedAtStr,
+			&senderID, &msgStatus, &senderName, &unreadCount,
+		)
+		if err != nil {
+			return nil, err
+		}
 
-        if name.Valid { conv.Name = name.String }
-        if photo.Valid { conv.Photo = photo.String }
-        if preview.Valid { conv.LastMessagePreview = preview.String }
-        
-        // Asignar nuevos campos al struct
-        if senderID.Valid { conv.LastMessageSenderID = senderID.String }
-        if msgStatus.Valid { conv.LastMessageStatus = msgStatus.String }
-        if senderName.Valid { conv.LastMessageSenderName = senderName.String }
+		// Asignaciones
+		c.UnreadCount = unreadCount
+		if name.Valid { c.Name = name.String }
+		if photo.Valid { c.Photo = photo.String }
+		if preview.Valid { c.LastMessagePreview = preview.String }
+		if senderID.Valid { c.LastMessageSenderID = senderID.String }
+		if msgStatus.Valid { c.LastMessageStatus = msgStatus.String }
+		if senderName.Valid { c.LastMessageSenderName = senderName.String }
 
-        // Fechas
-        conv.LastMessageAt = time.Time{}
-        if lastMsgAt.Valid && lastMsgAt.String != "" {
-            t, err := time.Parse(layoutSQLite, lastMsgAt.String)
-            if err != nil { t, _ = time.Parse(time.RFC3339, lastMsgAt.String) }
-            conv.LastMessageAt = t
-        }
+		// --- LÓGICA DE FECHAS Y ORDENACIÓN ---
+		
+		// 1. Parsear LastMessageAt
+		var tMsg time.Time
+		if lastMsgAtStr.Valid && lastMsgAtStr.String != "" {
+			t, err := time.Parse(time.RFC3339, lastMsgAtStr.String)
+			if err != nil {
+				t, _ = time.Parse(layoutSQLite, lastMsgAtStr.String)
+			}
+			tMsg = t
+			c.LastMessageAt = t
+		}
 
-        joinedAtTime := time.Time{}
-        if joinedAt.Valid && joinedAt.String != "" {
-            t, err := time.Parse(layoutSQLite, joinedAt.String)
-            if err != nil { t, _ = time.Parse(time.RFC3339, joinedAt.String) }
-            joinedAtTime = t
-        }
+		// 2. Parsear JoinedAt
+		var tJoined time.Time
+		if joinedAtStr.Valid && joinedAtStr.String != "" {
+			t, err := time.Parse(time.RFC3339, joinedAtStr.String)
+			if err != nil {
+				t, _ = time.Parse(layoutSQLite, joinedAtStr.String)
+			}
+			tJoined = t
+		}
 
-        // Lógica de ordenación (Mantenida igual)
-        conv.TempOrderAt = conv.LastMessageAt
-        if joinedAtTime.After(conv.LastMessageAt) {
-            conv.TempOrderAt = joinedAtTime
-        }
+		// 3. Decidir cuál es la fecha "mandataria" para ordenar
+		// Si hay mensaje, suele ser la más reciente.
+		// Si no hay mensaje, usamos la fecha de unión/creación.
+		if tMsg.After(tJoined) {
+			c.TempOrderAt = tMsg
+		} else {
+			c.TempOrderAt = tJoined
+		}
 
-        // 2. CARGAR PARTICIPANTES (Tu función auxiliar se mantiene igual)
-        conv.Participants, _ = db.getParticipantsByConversation(conv.ID)
+		// --- CARGAR PARTICIPANTES (Para nombre dinámico) ---
+		c.Participants, _ = db.getParticipantsByConversation(c.ID)
+		if c.Type == "direct" {
+			for _, p := range c.Participants {
+				if p.ID != userID {
+					c.Name = p.Name
+					c.Photo = p.Photo
+					break 
+				}
+			}
+		}
 
-        // 3. LÓGICA DE NOMBRE (Directo vs Grupo)
-        if conv.Type == "direct" {
-            for _, p := range conv.Participants {
-                if p.ID != userID {
-                    conv.Name = p.Name
-                    conv.Photo = p.Photo
-                    break 
-                }
-            }
-        }
+		convs = append(convs, c)
+	}
 
-        convs = append(convs, conv)
-    }
+	// ORDENACIÓN FINAL EN GO (Descendente: Más nuevo primero)
+	sort.Slice(convs, func(i, j int) bool {
+		return convs[i].TempOrderAt.After(convs[j].TempOrderAt)
+	})
 
-    sort.Slice(convs, func(i, j int) bool {
-        return convs[i].TempOrderAt.After(convs[j].TempOrderAt)
-    })
-
-    return convs, nil
+	return convs, nil
 }
 
 func (db *appdbimpl) getParticipantsByConversation(convID string) ([]models.User, error) {

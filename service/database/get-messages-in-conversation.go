@@ -14,7 +14,7 @@ func (db *appdbimpl) GetMessagesInConversation(
 	before string,
 ) ([]models.Message, error) {
 
-	// 1. Validar si el usuario pertenece a la conversación
+	// 1. Validar acceso
 	var count int
 	err := db.c.QueryRow(`
 		SELECT COUNT(*)
@@ -29,7 +29,7 @@ func (db *appdbimpl) GetMessagesInConversation(
 		return nil, models.ErrForbidden
 	}
 
-	// 2. Query Principal
+	// 2. Query real (AÑADIDO m.status)
 	query := `
 		SELECT 
 			m.id,
@@ -40,7 +40,8 @@ func (db *appdbimpl) GetMessagesInConversation(
 			m.text,
 			m.photo,
 			m.reply_to_message_id,
-			m.created_at
+			m.created_at,
+			m.status  -- <--- ¡AQUÍ FALTABA ESTO!
 		FROM messages m
 		JOIN users u ON u.id = m.sender_id
 		WHERE m.conversation_id = ?
@@ -52,7 +53,7 @@ func (db *appdbimpl) GetMessagesInConversation(
 		args = append(args, before)
 	}
 
-	// Ordenamos por fecha DESC para paginación
+	// Ordenamos por fecha DESC
 	query += " ORDER BY m.created_at DESC LIMIT ?"
 	args = append(args, limit)
 
@@ -69,33 +70,37 @@ func (db *appdbimpl) GetMessagesInConversation(
 	for rows.Next() {
 		var m models.Message
 		
-		// --- VARIABLES TEMPORALES PARA NULLS ---
-		var senderPhoto sql.NullString // <--- NUEVO: Para evitar el crash
+		// VARIABLES TEMPORALES
+		var senderPhoto sql.NullString
 		var txt sql.NullString
 		var photo sql.NullString
 		var replyTo sql.NullString
 		var createdAtStr string 
+		var status string // <--- VARIABLE PARA EL ESTADO
 
 		err = rows.Scan(
 			&m.ID,
 			&m.Sender.ID,
 			&m.Sender.Name,
-			&senderPhoto, // <--- CORREGIDO: Usamos la variable NullString
+			&senderPhoto,
 			&m.ConversationID,
 			&txt,       
 			&photo,     
 			&replyTo,   
-			&createdAtStr, 
+			&createdAtStr,
+			&status, // <--- ESCANEAMOS EL ESTADO
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		// ASIGNACIONES SEGURAS
-		if senderPhoto.Valid { m.Sender.Photo = senderPhoto.String } // <--- Pasamos el valor al struct
+		if senderPhoto.Valid { m.Sender.Photo = senderPhoto.String }
 		if txt.Valid { m.Text = txt.String }
 		if photo.Valid { m.Photo = photo.String }
 		if replyTo.Valid { m.ReplyToMessageID = replyTo.String }
+		
+		// Asignamos el estado al struct
+		m.Status = status 
 
 		// PARSEAR FECHA
 		t, err := time.Parse(layoutSQLite, createdAtStr)
@@ -104,14 +109,12 @@ func (db *appdbimpl) GetMessagesInConversation(
 		}
 		m.CreatedAt = t
 
-		// Cargar Reacciones (si tienes la función implementada)
-		reactions, _ := db.GetReactions(m.ID)
-		m.Reactions = reactions
+		// Reacciones (Opcional, si lo usas)
+		// m.Reactions, _ = db.GetReactions(m.ID)
 
 		msgs = append(msgs, m)
 	}
 
-	// IMPORTANTE: El frontend espera el array vacío [] en lugar de null si no hay mensajes
 	if msgs == nil {
 		msgs = []models.Message{}
 	}

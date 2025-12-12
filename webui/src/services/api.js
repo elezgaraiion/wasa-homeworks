@@ -43,7 +43,8 @@ export async function getCurrentUser() {
 }
 
 export async function getConversations() {
-  return request('/conversations');
+  // Añadimos ?_t=... para forzar al navegador a pedir datos frescos siempre
+  return request(`/conversations?_t=${Date.now()}`);
 }
 
 export async function updateUserName(newName) {
@@ -96,5 +97,21 @@ export async function sendMessage(conversationId, text) {
   return request(`/conversations/${conversationId}/messages`, {
     method: 'POST',
     body: JSON.stringify({ text: text })
+  });
+}
+export async function getChatInfo(conversationId) {
+  return request(`/conversations/${conversationId}`);
+}
+export async function markChatAsRead(conversationId) {
+  // POST /conversations/:id/seen
+  return request(`/conversations/${conversationId}/seen`, {
+    method: 'POST'
+  });
+}
+export async function createGroup(name, userIds) {
+  // POST /groups
+  return request('/conversations', {
+    method: 'POST',
+    body: JSON.stringify({ name: name, users: userIds })
   });
 }

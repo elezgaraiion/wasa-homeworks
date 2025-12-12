@@ -52,9 +52,12 @@ import ChatWindow from '../components/ChatWindow.vue';
 import { getCurrentUser } from '../services/api';
 
 const currentChat = ref(null);
-const showProfileEdit = ref(false); 
+const showProfileEdit = ref(false);
 
 function handleChatSelected(chat) {
+  // RESETEAMOS LA BOLA VERDE AL MOMENTO
+  chat.unreadCount = 0;
+  
   currentChat.value = chat;
   showProfileEdit.value = false;
 }
@@ -72,59 +75,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.dashboard-layout { 
-  display: flex; 
-  height: 100vh; 
-  width: 100vw; 
-  background-color: #0b141a; 
-  overflow: hidden; 
-}
-
-.left-pane { 
-  width: 30%; 
-  min-width: 300px; 
-  max-width: 450px; 
-  height: 100%; 
-  border-right: 1px solid #333; 
-  display: flex; 
-  flex-direction: column; 
-}
-
-/* --- CAMBIO IMPORTANTE AQUÍ --- */
-.right-pane { 
-  flex: 1; 
-  background-color: #222e35; 
-  border-left: 1px solid #333; 
-  position: relative;
-  /* Quitamos align-items y justify-content center para que el chat se estire */
-  display: flex; 
-  flex-direction: column; 
-}
-
-/* Clase para centrar SOLO el contenido de bienvenida/perfil */
-.welcome-placeholder { 
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center; 
-  color: #e9edef; 
-  z-index: 10;
-  /* Fondo estilo WhatsApp para la pantalla vacía */
-  background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
-  background-blend-mode: overlay;
-  background-color: #222e35; 
-}
-
-.placeholder-img {
-  opacity: 0.4; 
-  filter: grayscale(100%); 
-  margin-bottom: 20px; 
-  border-radius: 50%;
-}
-
+.dashboard-layout { display: flex; height: 100vh; width: 100vw; background-color: #0b141a; overflow: hidden; }
+.left-pane { width: 30%; min-width: 300px; max-width: 450px; height: 100%; border-right: 1px solid #333; display: flex; flex-direction: column; }
+.right-pane { flex: 1; background-color: #222e35; border-left: 1px solid #333; position: relative; display: flex; flex-direction: column; }
+.welcome-placeholder { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #e9edef; z-index: 10; background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png"); background-blend-mode: overlay; background-color: #222e35; }
+.placeholder-img { opacity: 0.4; filter: grayscale(100%); margin-bottom: 20px; border-radius: 50%; }
 .welcome-placeholder h2 { font-weight: 300; margin-bottom: 10px; font-size: 2rem; }
 .welcome-placeholder p { color: #8696a0; }
 .encrypted-text { margin-top: 40px; font-size: 0.8rem; color: #667781 !important; }

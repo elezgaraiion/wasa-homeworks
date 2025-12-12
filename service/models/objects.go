@@ -20,6 +20,8 @@ type Conversation struct {
 	LastMessageStatus   string `json:"lastMessageStatus"`   // Para los ticks (sent, read)
 	LastMessageSenderName string `json:"lastMessageSenderName"` // Para poner "Luis: Hola..." en grupos
 	
+    UnreadCount int `json:"unreadCount"`
+    
 	Participants []User    `db:"participants" json:"participants"`
 	TempOrderAt  time.Time `json:"-"`
 }

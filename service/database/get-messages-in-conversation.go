@@ -22,28 +22,19 @@ func (db *appdbimpl) GetMessagesInConversation(
 		WHERE conversation_id = ? AND user_id = ?
 	`, convID, userID).Scan(&count)
 
-	if err != nil {
-		return nil, err
-	}
-	if count == 0 {
-		return nil, models.ErrForbidden
-	}
+	if err != nil { return nil, err }
+	if count == 0 { return nil, models.ErrForbidden }
 
-	// 2. Query real (AÑADIDO m.status)
+	// 2. Query de Mensajes
 	query := `
 		SELECT 
-			m.id,
-			m.sender_id,
-			u.name,
-			u.photo,
-			m.conversation_id,
-			m.text,
-			m.photo,
-			m.reply_to_message_id,
-			m.created_at,
-			m.status  -- <--- ¡AQUÍ FALTABA ESTO!
+			m.id, m.sender_id, u.name, u.photo, m.conversation_id,
+			m.text, m.photo, m.reply_to_message_id, m.created_at, m.status,
+			r.text, r.photo, ru.name
 		FROM messages m
 		JOIN users u ON u.id = m.sender_id
+		LEFT JOIN messages r ON m.reply_to_message_id = r.id
+		LEFT JOIN users ru ON r.sender_id = ru.id
 		WHERE m.conversation_id = ?
 	`
 	args := []any{convID}
@@ -53,114 +44,131 @@ func (db *appdbimpl) GetMessagesInConversation(
 		args = append(args, before)
 	}
 
-	// Ordenamos por fecha DESC
 	query += " ORDER BY m.created_at DESC LIMIT ?"
 	args = append(args, limit)
 
 	rows, err := db.c.Query(query, args...)
+	if err != nil { return nil, err }
+	defer rows.Close()
+
+	msgs := []models.Message{}
+	const layoutSQLite = "2006-01-02 15:04:05"
+
+	for rows.Next() {
+		var m models.Message
+		var senderPhoto, txt, photo, replyToID sql.NullString
+		var createdAtStr, status string
+		var rText, rPhoto, rSenderName sql.NullString
+
+		err = rows.Scan(
+			&m.ID, &m.Sender.ID, &m.Sender.Name, &senderPhoto, &m.ConversationID,
+			&txt, &photo, &replyToID, &createdAtStr, &status,
+			&rText, &rPhoto, &rSenderName,
+		)
+		if err != nil { return nil, err }
+
+		if senderPhoto.Valid { m.Sender.Photo = senderPhoto.String }
+		if txt.Valid { m.Text = txt.String }
+		if photo.Valid { m.Photo = photo.String }
+		m.Status = status 
+
+		t, err := time.Parse(layoutSQLite, createdAtStr)
+		if err != nil { t, _ = time.Parse(time.RFC3339, createdAtStr) }
+		m.CreatedAt = t
+
+		// ReplyTo Logic
+		if replyToID.Valid && replyToID.String != "" {
+			m.ReplyToMessageID = replyToID.String
+			m.ReplyTo = &models.Message{
+				ID:    replyToID.String,
+				Text:  rText.String,
+				Photo: rPhoto.String,
+				Sender: models.User{ Name: rSenderName.String },
+			}
+		}
+
+		// =================================================================
+		// ¡¡AQUÍ ES DONDE ESTABA EL PROBLEMA!!
+		// Tienes que cargar las reacciones para CADA mensaje
+		// =================================================================
+		reactions, _ := db.GetReactions(m.ID)
+		
+		if reactions == nil {
+			m.Reactions = []models.Reaction{} // Array vacío para evitar null
+		} else {
+			m.Reactions = reactions
+		}
+		// =================================================================
+
+		msgs = append(msgs, m)
+	}
+
+	if msgs == nil { msgs = []models.Message{} }
+	return msgs, nil
+}
+func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
+	rows, err := db.c.Query(`
+		SELECT 
+			r.id, 
+			r.user_id, 
+			u.name, 
+			u.photo, -- Esto puede ser NULL
+			r.emoji, 
+			r.created_at
+		FROM reactions r
+		JOIN users u ON u.id = r.user_id
+		WHERE r.message_id = ?
+		ORDER BY r.created_at ASC
+	`, messageID)
+
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	msgs := []models.Message{}
-	
-	const layoutSQLite = "2006-01-02 15:04:05"
+	var reactions []models.Reaction
 
 	for rows.Next() {
-		var m models.Message
+		var r models.Reaction
+		var createdAtStr string
 		
-		// VARIABLES TEMPORALES
-		var senderPhoto sql.NullString
-		var txt sql.NullString
-		var photo sql.NullString
-		var replyTo sql.NullString
-		var createdAtStr string 
-		var status string // <--- VARIABLE PARA EL ESTADO
+		// IMPORTANTE: Usamos sql.NullString para la foto, 
+		// porque si la base de datos devuelve NULL, el Scan fallaría con un string normal.
+		var userPhoto sql.NullString
 
 		err = rows.Scan(
-			&m.ID,
-			&m.Sender.ID,
-			&m.Sender.Name,
-			&senderPhoto,
-			&m.ConversationID,
-			&txt,       
-			&photo,     
-			&replyTo,   
+			&r.ID,
+			&r.User.ID,
+			&r.User.Name,
+			&userPhoto,
+			&r.Emoji,
 			&createdAtStr,
-			&status, // <--- ESCANEAMOS EL ESTADO
 		)
 		if err != nil {
+			// Si falla el escaneo, devolvemos el error para saber qué pasa
 			return nil, err
 		}
 
-		if senderPhoto.Valid { m.Sender.Photo = senderPhoto.String }
-		if txt.Valid { m.Text = txt.String }
-		if photo.Valid { m.Photo = photo.String }
-		if replyTo.Valid { m.ReplyToMessageID = replyTo.String }
-		
-		// Asignamos el estado al struct
-		m.Status = status 
-
-		// PARSEAR FECHA
-		t, err := time.Parse(layoutSQLite, createdAtStr)
-		if err != nil {
-			t, _ = time.Parse(time.RFC3339, createdAtStr)
+		// Asignamos la foto si es válida
+		if userPhoto.Valid {
+			r.User.Photo = userPhoto.String
 		}
-		m.CreatedAt = t
 
-		// Reacciones (Opcional, si lo usas)
-		// m.Reactions, _ = db.GetReactions(m.ID)
+		// Parsear fecha
+		t, err := time.Parse(time.RFC3339, createdAtStr)
+		if err == nil {
+			r.CreatedAt = t
+		}
 
-		msgs = append(msgs, m)
+		reactions = append(reactions, r)
 	}
 
-	if msgs == nil {
-		msgs = []models.Message{}
+	// Devolver array vacío en lugar de nil si no hay datos
+	if reactions == nil {
+		reactions = []models.Reaction{}
 	}
 
-	return msgs, nil
-}
-func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
-
-    rows, err := db.c.Query(`
-        SELECT 
-            r.id,
-            r.user_id,
-            u.name,
-            u.photo,
-            r.emoji,
-            r.created_at
-        FROM reactions r
-        JOIN users u ON u.id = r.user_id
-        WHERE r.message_id = ?
-        ORDER BY r.created_at ASC
-    `, messageID)
-
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
-
-    reactions := []models.Reaction{}
-
-    for rows.Next() {
-        var r models.Reaction
-        err = rows.Scan(
-            &r.ID,
-            &r.User.ID,
-            &r.User.Name,
-            &r.User.Photo,
-            &r.Emoji,
-            &r.CreatedAt,
-        )
-        if err != nil {
-            return nil, err
-        }
-        reactions = append(reactions, r)
-    }
-
-    return reactions, nil
+	return reactions, nil
 }
 
 func (db *appdbimpl) applySeenStatus(

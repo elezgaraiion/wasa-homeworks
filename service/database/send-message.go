@@ -5,108 +5,107 @@ import(
 	"time"
 	"database/sql"
 	"github.com/google/uuid"
+	"fmt"
 
 
 )
-func (db *appdbimpl) SendMessage(
-	senderID, convID, text, photoURL, replyToMessageID string,
-) (models.Message, error) {
-
-	// 1. Validar pertenencia (Lectura rápida antes de la transacción)
+func (db *appdbimpl) SendMessage(userID string, conversationID string, text string, photoURL string, replyToMessageID string) (models.Message, error) {
+	
+	// 1. Validar que el usuario está en la conversación
 	var count int
-	err := db.c.QueryRow(`
-		SELECT COUNT(*) 
-		FROM conversation_participants
-		WHERE conversation_id = ? AND user_id = ?
-	`, convID, senderID).Scan(&count)
-	if err != nil {
-		return models.Message{}, err
-	}
-	if count == 0 {
-		return models.Message{}, models.ErrForbidden
+	err := db.c.QueryRow(`SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = ? AND user_id = ?`, conversationID, userID).Scan(&count)
+	if err != nil { return models.Message{}, err }
+	if count == 0 { return models.Message{}, models.ErrForbidden }
+
+	// 2. Preparar datos
+	msgID := uuid.New().String()
+	now := time.Now().UTC()
+	nowStr := now.Format(time.RFC3339)
+
+	// Manejo de nulos para SQL
+	var sqlReplyID sql.NullString
+	if replyToMessageID != "" {
+		sqlReplyID.String = replyToMessageID
+		sqlReplyID.Valid = true
 	}
 
-	// 2. INICIAR TRANSACCIÓN (Para hacer todo o nada)
+	var sqlPhoto sql.NullString
+	if photoURL != "" {
+		sqlPhoto.String = photoURL
+		sqlPhoto.Valid = true
+	}
+
+	// 3. INICIAR TRANSACCIÓN
 	tx, err := db.c.Begin()
 	if err != nil { return models.Message{}, err }
-	defer tx.Rollback() // Si algo falla, deshacemos todo
+	defer tx.Rollback()
 
-	// Validar existencia conversación
-	var convType string
-	err = tx.QueryRow(`SELECT type FROM conversations WHERE id = ?`, convID).Scan(&convType)
-	if err == sql.ErrNoRows {
-		return models.Message{}, models.ErrConversationNotFound
-	} else if err != nil {
-		return models.Message{}, err
-	}
+	// Insertar Mensaje (INCLUYENDO FOTO)
+	_, err = tx.Exec(`
+		INSERT INTO messages (id, conversation_id, sender_id, text, photo, created_at, status, reply_to_message_id)
+		VALUES (?, ?, ?, ?, ?, ?, 'delivered', ?)
+	`, msgID, conversationID, userID, text, sqlPhoto, nowStr, sqlReplyID)
+	if err != nil { return models.Message{}, fmt.Errorf("insert msg: %w", err) }
 
-	// 3. Preparar datos
-	msgID := uuid.New().String()
-	createdAt := time.Now().UTC()
-	createdAtStr := createdAt.Format(time.RFC3339)
-
-	// Calcular el preview (Si es foto sin texto, ponemos icono)
+	// Actualizar Portada Conversación (Preview)
 	preview := text
-	if text == "" && photoURL != "" {
+	if preview == "" && photoURL != "" {
 		preview = "📷 Foto"
 	}
-    // Truncar preview si es muy largo (opcional, por seguridad)
-    if len(preview) > 50 {
-        preview = preview[:47] + "..."
-    }
-
-	// 4. INSERTAR EL MENSAJE
-	_, err = tx.Exec(`
-		INSERT INTO messages(id, sender_id, conversation_id, text, photo, reply_to_message_id, created_at, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, msgID, senderID, convID, text, photoURL, replyToMessageID, createdAtStr, "delivered")
-	if err != nil {
-		return models.Message{}, err
-	}
-
-	// 5. ACTUALIZAR LA CONVERSACIÓN (¡LA CLAVE PARA EL PREVIEW!)
-	// Actualizamos la fecha y el resumen para que salga arriba en la lista
 	_, err = tx.Exec(`
 		UPDATE conversations 
 		SET last_message_preview = ?, last_message_at = ?
 		WHERE id = ?
-	`, preview, createdAtStr, convID)
-	if err != nil {
-		return models.Message{}, err
-	}
+	`, preview, nowStr, conversationID)
+	if err != nil { return models.Message{}, fmt.Errorf("update conv: %w", err) }
 
-    // 6. ACTUALIZAR MI "VISTO" (Para que no me salga bola verde a mí mismo)
-    // Upsert: Si no existe la fila meta, la crea. Si existe, actualiza fecha.
-    _, err = tx.Exec(`
-        INSERT INTO conversation_user_meta (conversation_id, user_id, joined_at, last_seen_message_at)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(conversation_id, user_id) 
-        DO UPDATE SET last_seen_message_at = excluded.last_seen_message_at
-    `, convID, senderID, createdAtStr, createdAtStr)
-    if err != nil {
-        return models.Message{}, err
-    }
+	// Actualizar Mi "Visto"
+	_, err = tx.Exec(`
+		INSERT INTO conversation_user_meta (conversation_id, user_id, last_seen_message_at, joined_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(conversation_id, user_id) 
+		DO UPDATE SET last_seen_message_at = excluded.last_seen_message_at
+	`, conversationID, userID, nowStr, nowStr)
+	if err != nil { return models.Message{}, fmt.Errorf("update meta: %w", err) }
 
-	// CONFIRMAR TRANSACCIÓN
-	if err := tx.Commit(); err != nil {
-		return models.Message{}, err
-	}
+	if err := tx.Commit(); err != nil { return models.Message{}, err }
 
-	// 7. Devolver mensaje completo (para que el frontend lo pinte)
-    // Recuperamos nombre del sender para que quede bonito si el frontend lo necesita
-    var senderName string
-    db.c.QueryRow("SELECT name FROM users WHERE id = ?", senderID).Scan(&senderName)
+	// 4. Construir el objeto mensaje básico de vuelta
+	var myName string
+	db.c.QueryRow("SELECT name FROM users WHERE id = ?", userID).Scan(&myName)
 
 	msg := models.Message{
 		ID:               msgID,
-		Sender:           models.User{ID: senderID, Name: senderName}, 
-		ConversationID:   convID,
+		ConversationID:   conversationID,
+		Sender:           models.User{ID: userID, Name: myName},
 		Text:             text,
-		Photo:            photoURL,
-		ReplyToMessageID: replyToMessageID,
-		CreatedAt:        createdAt,
+		Photo:            photoURL, // <--- La devolvemos aquí
+		CreatedAt:        now,
 		Status:           "delivered",
-		Reactions:        []models.Reaction{},
+		ReplyToMessageID: replyToMessageID,
+	}
+
+	// 5. BLOQUE CLAVE: Rellenar datos del ReplyTo para el Frontend
+	if replyToMessageID != "" {
+		var rText, rPhoto, rSenderName sql.NullString
+		
+		err := db.c.QueryRow(`
+			SELECT m.text, m.photo, u.name 
+			FROM messages m
+			JOIN users u ON m.sender_id = u.id
+			WHERE m.id = ?
+		`, replyToMessageID).Scan(&rText, &rPhoto, &rSenderName)
+
+		if err == nil {
+			msg.ReplyTo = &models.Message{
+				ID:    replyToMessageID,
+				Text:  rText.String,
+				Photo: rPhoto.String,
+				Sender: models.User{
+					Name: rSenderName.String,
+				},
+			}
+		}
 	}
 
 	return msg, nil

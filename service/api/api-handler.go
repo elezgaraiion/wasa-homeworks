@@ -23,7 +23,7 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.DELETE("/conversations/:conversationId/messages/:messageId", rt.deleteMessage)
 	rt.router.GET("/conversations/:conversationId/messages/:messageId/reactions", rt.listReactionsForMessage)
 	rt.router.POST("/conversations/:conversationId/messages/:messageId/reactions", rt.addReactionToMessage)
-	rt.router.DELETE("/conversations/:conversationId/messages/:messageId/reactions/reactionId", rt.removeReactionFromMessage)
+	rt.router.DELETE("/conversations/:conversationId/messages/:messageId/reactions/:reactionId", rt.removeReactionFromMessage)
 	rt.router.POST("/conversations/:conversationId/users", rt.addUserToGroup)
 	rt.router.DELETE("/conversations/:conversationId/users/me", rt.leaveGroup)
 	rt.router.PUT("/conversations/:conversationId/name", rt.setGroupName)

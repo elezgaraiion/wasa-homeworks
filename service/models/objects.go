@@ -42,5 +42,6 @@ type Message struct {
     ReplyToMessageID string     `db:"reply_to_message_id,omitempty" json:"replyToMessageId,omitempty"` 
     CreatedAt        time.Time  `db:"created_at" json:"createdAt"`         
     Reactions        []Reaction `db:"reactions,omitempty" json:"reactions,omitempty"`
-    Status           string     `db:"status" json:"status"`             
+    Status           string     `db:"status" json:"status"` 
+	ReplyTo          *Message `json:"replyTo,omitempty"`            
 }

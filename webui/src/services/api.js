@@ -93,10 +93,17 @@ export async function createPrivateChat(targetUserId) {
     body: JSON.stringify({ targetUserId })
   });
 }
-export async function sendMessage(conversationId, text) {
-  return request(`/conversations/${conversationId}/messages`, {
+export async function sendMessage(chatId, text, replyToMessageId = null) {
+  const payload = { 
+      text: text,
+      // IMPORTANTE: Asegúrate de que el nombre del campo coincide
+      // con lo que espera tu struct de Go (json:"replyToMessageId")
+      replyToMessageId: replyToMessageId 
+  };
+  
+  return request(`/conversations/${chatId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ text: text })
+    body: JSON.stringify(payload)
   });
 }
 export async function getChatInfo(conversationId) {
@@ -114,4 +121,69 @@ export async function createGroup(name, userIds) {
     method: 'POST',
     body: JSON.stringify({ name: name, users: userIds })
   });
+}
+export async function forwardMessage(sourceChatId, messageId, targetChatId) {
+  return request(`/conversations/${sourceChatId}/messages/${messageId}`, {
+    method: 'POST',
+    body: JSON.stringify({ targetConversationId: targetChatId })
+  });
+}
+export async function deleteMessage(chatId, messageId) {
+  // DELETE /conversations/:id/messages/:msgId
+  return request(`/conversations/${chatId}/messages/${messageId}`, {
+    method: 'DELETE'
+  });
+}
+export async function addReaction(chatId, messageId, emoji) {
+  return request(`/conversations/${chatId}/messages/${messageId}/reactions`, {
+    method: 'POST',
+    body: JSON.stringify({ emoji })
+  });
+}
+
+export async function removeReaction(chatId, messageId, reactionId) {
+  return request(`/conversations/${chatId}/messages/${messageId}/reactions/${reactionId}`, {
+    method: 'DELETE'
+  });
+}
+export async function addUserToGroup(conversationId, userId) {
+  return request(`/conversations/${conversationId}/users`, {
+      method: 'POST',
+      body: JSON.stringify({ userId })
+  });
+}
+
+// Salir del grupo
+export async function leaveGroup(conversationId) {
+  return request(`/conversations/${conversationId}/users/me`, {
+      method: 'DELETE'
+  });
+}
+
+// Cambiar nombre del grupo
+export async function setGroupName(conversationId, name) {
+  return request(`/conversations/${conversationId}/name`, {
+      method: 'PUT',
+      body: JSON.stringify({ name })
+  });
+}
+
+// Cambiar foto del grupo (Multipart/Form-data)
+export async function setGroupPhoto(conversationId, file) {
+  const formData = new FormData();
+  formData.append('photoFile', file);
+
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/photo`, {
+      method: 'PUT',
+      headers: {
+          'Authorization': token // NO poner Content-Type, el navegador lo pone solo con el boundary
+      },
+      body: formData
+  });
+
+  if (!response.ok) {
+      throw new Error(await response.text());
+  }
+  return await response.json();
 }

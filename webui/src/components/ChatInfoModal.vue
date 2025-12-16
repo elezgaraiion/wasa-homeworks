@@ -1,35 +1,76 @@
 <template>
-  <div class="modal-backdrop" @click.self="$emit('close')">
-    <div class="info-card">
+  <div class="modal-overlay" @click.self="$emit('close')">
+    <div class="modal-content">
+      <button class="close-btn" @click="$emit('close')">✕</button>
       
-      <div class="card-header">
-        <h2>{{ chatType === 'group' ? 'Info del Grupo' : 'Info del Contacto' }}</h2>
-        <button class="btn-close" @click="$emit('close')">✕</button>
-      </div>
-
-      <div class="info-body" v-if="loading">
-        <div class="spinner"></div>
-      </div>
-
-      <div class="info-body" v-else>
-        <div class="profile-header">
-          <img :src="info.photo || info.Photo || DEFAULT_AVATAR" class="big-avatar" />
-          <h3 class="chat-title">{{ info.name || info.Name }}</h3>
-          <p class="chat-subtitle" v-if="chatType === 'group'">
-            Grupo · {{ info.participants?.length || 0 }} participantes
-          </p>
+      <div class="group-header">
+        <div class="photo-container">
+            <img 
+                :src="localChat.photo || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" 
+                class="group-avatar" 
+            />
+            <label v-if="isGroup" class="edit-photo-btn">
+                📷
+                <input type="file" @change="handlePhotoChange" accept="image/*" hidden />
+            </label>
         </div>
 
-        <div class="section-title">Participantes</div>
-        <div class="participants-list">
-          <div v-for="user in info.participants" :key="user.id" class="participant-row">
-            <img :src="user.photo || DEFAULT_AVATAR" class="part-avatar" />
-            <div class="part-info">
-              <span class="part-name">{{ user.name }}</span>
-              <span v-if="user.id === myId" class="you-badge">Tú</span>
+        <div class="name-container">
+            
+            <div v-if="isEditingName" class="edit-mode-wrapper">
+                <input 
+                    v-model="newName" 
+                    @keyup.enter="saveName"
+                    ref="nameInput"
+                    class="name-input"
+                    placeholder="Nuevo nombre..."
+                />
+                <div class="edit-actions">
+                    <button @click="saveName" class="btn-confirm">Confirmar</button>
+                    <button @click="isEditingName = false" class="btn-cancel">Cancelar</button>
+                </div>
             </div>
-          </div>
+
+            <div v-else class="view-mode-wrapper">
+                <h2>{{ localChat.name || localChat.Name || 'Chat' }}</h2>
+                <button v-if="isGroup" @click="startEditingName" class="icon-btn">✎</button>
+            </div>
+
         </div>
+        
+        <p class="participants-count" v-if="isGroup">
+            {{ participantsList.length }} participantes
+        </p>
+      </div>
+
+      <hr class="divider" />
+
+      <div v-if="isGroup" class="add-section">
+        <h3>Añadir participantes</h3>
+        <input 
+            v-model="searchQuery" 
+            @input="handleSearch" 
+            type="text" 
+            placeholder="Buscar usuarios por nombre..." 
+            class="search-input"
+        />
+
+        <div class="user-list" v-if="searchResults.length > 0">
+            <div v-for="user in searchResults" :key="user.id" class="user-row">
+                <img :src="user.photo || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" class="user-avatar-small" />
+                <span class="user-name">{{ user.name }}</span>
+                
+                <button v-if="isAlreadyMember(user.id)" class="btn-member" disabled>Ya es miembro</button>
+                <button v-else class="btn-add" @click="addToGroup(user)">Añadir</button>
+            </div>
+        </div>
+        <div v-else-if="searchQuery.length > 2" class="no-results">
+            No se encontraron usuarios.
+        </div>
+      </div>
+
+      <div v-if="isGroup" class="danger-zone">
+        <button class="btn-leave" @click="handleLeaveGroup">Salir del grupo</button>
       </div>
 
     </div>
@@ -37,61 +78,161 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { getChatInfo } from '../services/api';
-import { store } from '../store.js';
+import { ref, watch, nextTick } from 'vue';
+import { setGroupName, setGroupPhoto, addUserToGroup, leaveGroup, searchUsers } from '../services/api';
 
-const props = defineProps(['chatId']);
-const emit = defineEmits(['close']);
+const props = defineProps(['chatId', 'chat']);
+const emit = defineEmits(['close', 'chatUpdated']);
 
-const DEFAULT_AVATAR = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
-const myId = store.currentUser?.id || localStorage.getItem('userId');
+const localChat = ref({});
+const participantsList = ref([]);
+const isGroup = ref(false);
 
-const info = ref({});
-const loading = ref(true);
-const chatType = ref('direct');
+const isEditingName = ref(false);
+const newName = ref('');
+const nameInput = ref(null);
 
-onMounted(async () => {
-  try {
-    const res = await getChatInfo(props.chatId);
-    info.value = res;
-    chatType.value = res.type || res.Type;
-  } catch (e) {
-    console.error(e);
-    alert("Error cargando info");
-    emit('close');
-  } finally {
-    loading.value = false;
-  }
-});
+const searchQuery = ref('');
+const searchResults = ref([]);
+
+// Sincronización inicial
+watch(() => props.chat, (newChat) => {
+    if (newChat) {
+        localChat.value = { ...newChat };
+        isGroup.value = newChat.type === 'group';
+        participantsList.value = newChat.participants || [];
+    }
+}, { immediate: true });
+
+function isAlreadyMember(userId) {
+    return participantsList.value.some(p => {
+        const pId = p.id || p.user_id || p; 
+        return pId === userId;
+    });
+}
+
+async function handleSearch() {
+    if (searchQuery.value.length < 2) {
+        searchResults.value = [];
+        return;
+    }
+    try {
+        const res = await searchUsers(searchQuery.value);
+        searchResults.value = res || [];
+    } catch (e) { console.error(e); }
+}
+
+async function addToGroup(user) {
+    try {
+        await addUserToGroup(props.chatId, user.id);
+        participantsList.value.push(user);
+        searchQuery.value = '';
+        searchResults.value = [];
+        emit('chatUpdated'); // Avisamos cambios
+        alert(`${user.name} añadido.`);
+    } catch (e) { alert("Error al añadir usuario."); }
+}
+
+function startEditingName() {
+    newName.value = localChat.value.name || '';
+    isEditingName.value = true;
+    nextTick(() => nameInput.value?.focus());
+}
+
+async function saveName() {
+    if (!newName.value.trim()) return;
+    try {
+        const updated = await setGroupName(props.chatId, newName.value);
+        // 1. Actualizamos localmente para feedback inmediato
+        localChat.value.name = updated.name;
+        isEditingName.value = false;
+        
+        // 2. Avisamos al padre (ChatWindow) pasando el nuevo nombre
+        emit('chatUpdated', { type: 'name', value: updated.name });
+        
+    } catch (e) {
+        alert("Error al cambiar el nombre.");
+    }
+}
+
+async function handlePhotoChange(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+        const updated = await setGroupPhoto(props.chatId, file);
+        const newPhotoUrl = updated.photo + '?t=' + new Date().getTime();
+        localChat.value.photo = newPhotoUrl;
+        
+        // Avisamos al padre
+        emit('chatUpdated', { type: 'photo', value: newPhotoUrl });
+    } catch (e) { alert("Error al subir la foto."); }
+}
+
+async function handleLeaveGroup() {
+    if(!confirm("¿Estás seguro de que quieres salir?")) return;
+    try {
+        await leaveGroup(props.chatId);
+        emit('chatUpdated');
+        emit('close');
+        window.location.reload(); 
+    } catch (e) { alert("Error al salir."); }
+}
 </script>
 
 <style scoped>
-.modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; justify-content: end; animation: fadeIn 0.2s; }
-.info-card { width: 400px; max-width: 90%; height: 100%; background: #111b21; border-left: 1px solid #333; display: flex; flex-direction: column; animation: slideLeft 0.3s; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+.modal-content { background: #202c33; width: 400px; max-height: 90vh; overflow-y: auto; border-radius: 12px; padding: 20px; position: relative; color: #e9edef; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border: 1px solid #374045; }
+.close-btn { position: absolute; top: 10px; right: 15px; background: none; border: none; color: #aebac1; font-size: 1.5rem; cursor: pointer; }
 
-.card-header { height: 60px; background: #202c33; display: flex; align-items: center; padding: 0 20px; color: #e9edef; font-weight: 500; justify-content: space-between; flex-shrink: 0; }
-.btn-close { background: none; border: none; color: #aebac1; cursor: pointer; font-size: 1.2rem; }
+/* CABECERA */
+.group-header { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 20px; }
+.photo-container { position: relative; width: 120px; height: 120px; }
+.group-avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid #00a884; }
+.edit-photo-btn { position: absolute; bottom: 5px; right: 5px; background: #00a884; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.4); font-size: 1.1rem; transition: transform 0.2s; }
+.edit-photo-btn:hover { transform: scale(1.1); }
 
-.info-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+/* ESTILOS DE EDICIÓN DE NOMBRE */
+.name-container { width: 100%; display: flex; justify-content: center; min-height: 40px; }
 
-.profile-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 30px; width: 100%; }
-.big-avatar { width: 200px; height: 200px; border-radius: 50%; object-fit: cover; margin-bottom: 15px; border: 4px solid #202c33; }
-.chat-title { color: #e9edef; font-size: 1.5rem; margin: 0; font-weight: 400; text-align: center; }
-.chat-subtitle { color: #8696a0; margin-top: 5px; font-size: 0.9rem; }
+.view-mode-wrapper { display: flex; align-items: center; gap: 10px; }
+.view-mode-wrapper h2 { margin: 0; font-size: 1.5rem; text-align: center; }
 
-.section-title { width: 100%; color: #00a884; font-size: 0.9rem; margin-bottom: 10px; font-weight: 500; align-self: flex-start; }
-.participants-list { width: 100%; display: flex; flex-direction: column; gap: 10px; }
-.participant-row { display: flex; align-items: center; padding: 8px; border-radius: 8px; transition: background 0.2s; }
-.participant-row:hover { background: #202c33; }
-.part-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 12px; object-fit: cover; }
-.part-info { display: flex; flex-direction: column; }
-.part-name { color: #e9edef; font-size: 1rem; }
-.you-badge { font-size: 0.75rem; color: #8696a0; }
+.edit-mode-wrapper { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.name-input { background: #2a3942; border: 1px solid #00a884; border-radius: 6px; color: white; font-size: 1.2rem; text-align: center; width: 80%; padding: 8px; outline: none; }
 
-.spinner { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid #00a884; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin-top: 50px; }
+.edit-actions { display: flex; gap: 10px; margin-top: 5px; }
+.btn-confirm { background: #00a884; color: white; border: none; padding: 6px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+.btn-confirm:hover { background: #008f6f; }
+.btn-cancel { background: transparent; border: 1px solid #8696a0; color: #8696a0; padding: 6px 15px; border-radius: 6px; cursor: pointer; }
+.btn-cancel:hover { border-color: #f15c6d; color: #f15c6d; }
 
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideLeft { from { transform: translateX(100%); } to { transform: translateX(0); } }
-@keyframes spin { 100% { transform: rotate(360deg); } }
+.icon-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #aebac1; padding: 5px; }
+.icon-btn:hover { color: #00a884; }
+.participants-count { color: #8696a0; font-size: 0.9rem; margin-top: -5px; }
+
+.divider { border: 0; border-top: 1px solid #374045; margin: 20px 0; }
+
+/* SECCIÓN AÑADIR */
+.add-section h3 { margin-bottom: 15px; font-size: 1rem; color: #00a884; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+.search-input { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #2a3942; color: white; margin-bottom: 15px; outline: none; font-size: 0.95rem; }
+.search-input:focus { box-shadow: 0 0 0 2px #00a884; }
+.no-results { color: #8696a0; text-align: center; font-style: italic; }
+
+.user-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 5px; }
+.user-row { display: flex; align-items: center; background: #111b21; padding: 10px; border-radius: 8px; gap: 12px; transition: background 0.2s; }
+.user-row:hover { background: #18242b; }
+.user-avatar-small { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.user-name { flex: 1; font-weight: 500; font-size: 0.95rem; }
+
+.btn-add { background: #00a884; color: white; border: none; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.8rem; transition: background 0.2s; }
+.btn-add:hover { background: #008f6f; }
+.btn-member { background: transparent; color: #8696a0; border: 1px solid #374045; padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; cursor: default; user-select: none; }
+
+.danger-zone { margin-top: 40px; border-top: 1px solid #374045; padding-top: 20px; display: flex; justify-content: center; }
+.btn-leave { background: transparent; color: #f15c6d; border: 1px solid #f15c6d; padding: 10px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; transition: background 0.2s; }
+.btn-leave:hover { background: rgba(241, 92, 109, 0.1); }
+
+.user-list::-webkit-scrollbar { width: 6px; }
+.user-list::-webkit-scrollbar-thumb { background: #374045; border-radius: 3px; }
+.user-list::-webkit-scrollbar-track { background: transparent; }
 </style>

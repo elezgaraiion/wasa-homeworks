@@ -6,32 +6,32 @@
       
       <transition name="fade">
         <button v-if="!showInput" @click="startInteraction" class="btn-start">
-          COMENZAR
+          START
         </button>
       </transition>
     </div>
 
     <div class="hidden-interface" :class="{ 'slide-down': showInput }">
       <div class="interface-content">
-        <h2>Identificación</h2>
-        <p>Introduce tu nombre clave para acceder</p>
+        <h2>Identification</h2>
+        <p>Enter your codename to access</p>
         
         <input 
           v-model="username" 
           type="text" 
-          placeholder="Nombre de usuario..." 
+          placeholder="Username..." 
           @keyup.enter="handleLogin"
           :disabled="loading"
           ref="inputField"
         />
 
         <button @click="handleLogin" :disabled="loading || !username.trim()" class="btn-enter">
-          {{ loading ? 'ACCEDIENDO...' : 'ENTRAR' }}
+          {{ loading ? 'ACCESSING...' : 'ENTER' }}
         </button>
         
         <p v-if="error" class="error-msg">{{ error }}</p>
         
-        <span class="cancel-link" @click="showInput = false">Cancelar</span>
+        <span class="cancel-link" @click="showInput = false">Cancel</span>
       </div>
     </div>
 
@@ -60,14 +60,13 @@ function startInteraction() {
 async function handleLogin() {
   error.value = '';
   if (username.value.trim().length < 3) {
-    error.value = 'El nombre es muy corto (min 3 letras).';
+    error.value = 'Name is too short (min 3 letters).';
     return;
   }
 
   loading.value = true;
   try {
     const data = await doLogin(username.value.trim());
-    
     
     const userId = data.id || data.identifier; 
 
@@ -84,18 +83,16 @@ async function handleLogin() {
 </script>
 
 <style scoped>
-/* ESTILOS BASE */
 .login-container {
   position: relative;
   width: 100vw;
   height: 100vh;
-  background-color: #0b141a; /* Fondo oscuro tipo WhatsApp dark */
-  color: #00a884; /* Verde WhatsApp */
+  background-color: #0b141a; 
+  color: #00a884; 
   overflow: hidden;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
-/* CAPA DE INTRODUCCIÓN */
 .intro-layer {
   height: 100%;
   display: flex;
@@ -106,7 +103,7 @@ async function handleLogin() {
 }
 
 .intro-layer.blurred {
-  filter: blur(5px) brightness(0.5); /* Efecto desenfoque cuando baja el panel */
+  filter: blur(5px) brightness(0.5); 
 }
 
 .giant-title {
@@ -137,20 +134,18 @@ async function handleLogin() {
   box-shadow: 0 0 30px #00a884;
 }
 
-/* EL PANEL OCULTO (HIDDEN INTERFACE) */
 .hidden-interface {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
-  height: 50vh; /* Ocupa la mitad superior */
+  height: 50vh; 
   background: #111b21;
   border-bottom: 2px solid #00a884;
   box-shadow: 0 10px 50px rgba(0,0,0,0.8);
   
-  /* ESTADO INICIAL: ESCONDIDO ARRIBA */
   transform: translateY(-100%); 
-  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); /* Efecto rebote suave */
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); 
   
   display: flex;
   justify-content: center;
@@ -158,7 +153,6 @@ async function handleLogin() {
   z-index: 10;
 }
 
-/* ESTADO ACTIVO: BAJA */
 .hidden-interface.slide-down {
   transform: translateY(0);
 }
@@ -229,7 +223,6 @@ input:focus {
   text-decoration: underline;
 }
 
-/* ANIMACIONES */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }

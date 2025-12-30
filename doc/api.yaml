@@ -124,6 +124,29 @@ components:
           format: date-time
           description: Timestamp of the most recent message in the conversation (ISO 8601).
           example: "2025-11-04T20:00:00Z"
+        lastMessageSenderId:
+          type: string
+          description: ID of the user who sent the last message.
+          example: "user123"
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Za-z0-9_-]+$'
+        lastMessageSenderName:
+          type: string
+          description: Name of the user who sent the last message.
+          example: "Juan"
+          minLength: 1
+          maxLength: 50
+        lastMessageStatus:
+          type: string
+          description: Status of the last message.
+          enum: [delivered, read]
+          example: "read"
+        unreadCount:
+          type: integer
+          description: Number of unread messages for the requesting user.
+          example: 5
+          minimum: 0
         participants:
           type: array
           description: List of users participating in the conversation.
@@ -202,6 +225,9 @@ components:
           minLength: 0
           maxLength: 64
           pattern: '^$|[A-Za-z0-9_-]+$'
+        replyTo:
+          description: Full object of the message being replied to.
+          $ref: "#/components/schemas/Message"
         createdAt:
           type: string
           format: date-time
@@ -311,21 +337,29 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    UnsupportedMediaType:
+      description: Unsupported Media Type
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "unsupported media type: only JPEG allowed"
 
 
 paths:
 
   /session:
     post:
-      tags: [Login]
-      summary: Logs in the user
-      description: |-
-        If the user does not exist, it will be created,
-        and an identifier is returned.
-        If the user exists, the user identifier is returned.
+      tags:
+        - Login
+      summary: Logs in or registers a user
+      description: >
+        Checks if a user exists by name. If they exist, returns their ID.
+        If not, creates a new user and returns the generated ID.
       operationId: doLogin
       requestBody:
-        description: User details
+        description: User name for login/registration.
+        required: true
         content:
           application/json:
             schema:
@@ -333,14 +367,15 @@ paths:
               properties:
                 name:
                   type: string
-                  example: Maria
-                  pattern: 'ˆ.*?$'
+                  description: The username to login with.
+                  example: "Maria"
                   minLength: 3
                   maxLength: 16
-        required: true
+              required:
+                - name
       responses:
-        '201':
-          description: User log-in action successful
+        '200':
+          description: Login successful (User ID returned).
           content:
             application/json:
               schema:
@@ -348,14 +383,24 @@ paths:
                 properties:
                   identifier:
                     type: string
-                    example: "abcdef012345"
+                    description: The User ID to use as the Bearer Token.
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+                required:
+                  - identifier
+        '400':
+          $ref: "#/components/responses/BadRequest"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
   /me:
     get:
+      tags:
+        - Profile
       summary: Get current user
-      description: Retrieve the profile of the user.
-      operationId: getCurrentUser
-      tags: [Profile]
+      description: Retrieve the profile of the authenticated user.
+      operationId: doGetCurrentUser
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Current user profile.
@@ -364,14 +409,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/User"
         '401':
-          $ref: "#/components/responses/Unauthorized"
+          description: Unauthorized. Authorization header is missing.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Unauthorized"
+        '404':
+          $ref: "#/components/responses/NotFound"
 
   /me/username:
     put:
       summary: Update user name
-      description: Change the authenticated user's display name. The new name must not be already in use.
-      operationId: setMyUserName
-      tags: [Profile]
+      description: Change the authenticated user's display name.
+      operationId: updateMyUserName
+      tags:
+        - Profile
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -386,8 +444,8 @@ paths:
                   example: "Maria Lopez"
                   minLength: 1
                   maxLength: 50
-                  pattern: '^[A-Za-zÀ-ÿ0-9 .''-]{1,50}$'
-              required: [name]
+              required:
+                - name
       responses:
         '200':
           description: Username updated successfully.
@@ -401,28 +459,29 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         '409':
           $ref: "#/components/responses/Conflict"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
   /me/photo:
     put:
       summary: Update profile photo
-      description: Upload and set a new profile photo for the authenticated user.
-      operationId: setMyPhoto
-      tags: [Profile]
+      description: Upload and set a new profile photo. Only **JPEG** images are allowed.
+      operationId: updatePhoto
+      tags:
+        - Profile
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              description: Multipart form data containing the new profile photo file.
               properties:
                 photoFile:
                   type: string
                   format: binary
-                  description: Binary image file to use as the new profile photo.
-                  minLength: 1
-                  maxLength: 10485760
-                  pattern: '^.+$'
+                  description: Binary image file (JPEG only).
               required:
                 - photoFile
       responses:
@@ -437,81 +496,86 @@ paths:
         '401':
           $ref: "#/components/responses/Unauthorized"
         '415':
-          description: Unsupported media type
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/UnsupportedMediaType"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
   /users:
     get:
+      tags:
+        - Users
       summary: List or search users
-      description: Retrieve all users or search by a partial name query.
+      description: >
+        Retrieve a list of users. Can filter by name (prefix search).
+        The authenticated user is excluded from the results.
       operationId: listOrSearchUsers
-      tags: [Users]
+      security:
+        - bearerAuth: []
       parameters:
         - name: q
           in: query
-          description: Optional case-insensitive search string to filter users by name.
+          description: Optional string to filter users (names starting with this value).
           required: false
           schema:
             type: string
-            pattern: '^[A-Za-zÀ-ÿ ]{0,32}$'
-            example: "Maria"
+            example: "Mar"
             minLength: 0
             maxLength: 32
       responses:
         '200':
-          description: List of users matching the criteria.
+          description: List of users found.
           content:
             application/json:
               schema:
                 type: array
-                description: Array of users that match the search query or all users if no query is provided.
-                minItems: 0
-                maxItems: 1000
                 items:
                   $ref: "#/components/schemas/User"
-        '400':
-          $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
   /conversations:
     get:
+      tags:
+        - Conversations
       summary: List user conversations
       description: >
-        Retrieve all conversations in which the authenticated user participates,
-        sorted by lastMessageAt in reverse chronological order (most recent first).
+        Retrieve all conversations the user participates in.
+        Results are sorted by most recent activity (last message timestamp or join date).
+        For 'direct' conversations, the name and photo returned are those of the other participant.
       operationId: getMyConversations
-      tags: [Conversations]
+      security:
+        - bearerAuth: []
       responses:
         '200':
-          description: List of conversations for the authenticated user.
+          description: List of conversations.
           content:
             application/json:
               schema:
                 type: array
-                description: Array of conversations.
-                minItems: 0
-                maxItems: 1000
                 items:
                   $ref: "#/components/schemas/Conversation"
         '401':
           $ref: "#/components/responses/Unauthorized"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
     post:
+      tags:
+        - Groups
       summary: Create a new group
-      description: Create a new group conversation including the creator.
+      description: Create a new group conversation. The authenticated user is automatically added as the creator.
       operationId: createGroup
-      tags: [Groups]
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              description: Payload for creating a group conversation.
+              description: Payload for creating a group.
               properties:
                 name:
                   type: string
@@ -522,9 +586,9 @@ paths:
                   pattern: '^[A-Za-zÀ-ÿ0-9 .''-]{1,100}$'
                 users:
                   type: array
-                  description: Optional list of user IDs to be added as initial members.
+                  description: List of user IDs to invite.
                   minItems: 0
-                  maxItems: 512
+                  maxItems: 511 # Ajustado para coincidir con tu lógica DB (max 511 invitados)
                   items:
                     type: string
                     description: User identifier.
@@ -532,7 +596,9 @@ paths:
                     maxLength: 64
                     pattern: '^[A-Za-z0-9_-]+$'
                   example: ["user123", "user456"]
-              required: [name,users]
+              required:
+                - name
+                - users
       responses:
         '201':
           description: Group created successfully.
@@ -544,13 +610,20 @@ paths:
           $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
   /conversations/{conversationId}:
     get:
+      tags:
+        - Conversations
       summary: Get a specific conversation
-      description: Retrieve detailed information about a specific conversation.
-      operationId: getConversation
-      tags: [Conversations]
+      description: >
+        Retrieve detailed information about a specific conversation.
+        If the conversation is 'direct', the name and photo returned are those of the other participant.
+      operationId: getConversationProfile
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/ConversationId"
       responses:
@@ -562,44 +635,52 @@ paths:
                 $ref: "#/components/schemas/Conversation"
         '401':
           $ref: "#/components/responses/Unauthorized"
-        '403':
-          $ref: "#/components/responses/Forbidden"
         '404':
+          description: Conversation not found or user is not a participant.
           $ref: "#/components/responses/NotFound"
 
   /conversations/{conversationId}/seen:
     post:
+      tags:
+        - Conversations
       summary: Mark conversation as seen
       description: >
-        Mark all messages before now as seen by current user.
-        For private chats, marks sender messages as seen.
-        For group chats, marks messages as seen individually per user.
+        Updates the 'last seen' timestamp for the user in the conversation.
+        Also triggers logic to update message statuses to 'read' if all participants have seen them.
       operationId: markConversationSeen
-      tags: [Conversations]
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/ConversationId"
       responses:
         '204':
-          description: Conversation marked as seen. No content returned.
+          description: Conversation marked as seen successfully. No content returned.
+        '400':
+          description: Missing conversation ID.
+          $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not a participant of this conversation.
           $ref: "#/components/responses/Forbidden"
         '404':
           $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
   /conversations/{conversationId}/messages:
-    parameters:
-      - $ref: "#/components/parameters/ConversationId"
-
     get:
+      tags:
+        - Messages
       summary: List messages in conversation
       description: >
-        Retrieve messages in a specific conversation, sorted by createdAt in
-        reverse chronological order (most recent first), including message status and reactions.
-      operationId: listMessagesInConversation
-      tags: [Messages]
+        Retrieve messages in a specific conversation, sorted by creation date (newest first).
+        Supports pagination via the 'before' timestamp parameter.
+      operationId: listConversationMessages
+      security:
+        - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/ConversationId"
         - name: limit
           in: query
           description: Maximum number of messages to return.
@@ -610,34 +691,44 @@ paths:
             default: 50
         - name: before
           in: query
-          description: Return messages created before this timestamp (ISO 8601).
+          description: Return messages created before this timestamp (ISO 8601) for pagination.
           schema:
             type: string
             format: date-time
       responses:
         '200':
-          description: Messages retrieved successfully.
+          description: List of messages retrieved successfully.
           content:
             application/json:
               schema:
                 type: array
-                description: Array of messages in the conversation.
-                minItems: 0
-                maxItems: 100
+                description: Array of messages. Returns an empty array if no messages exist.
                 items:
                   $ref: "#/components/schemas/Message"
+        '400':
+          description: Invalid conversation ID or limit parameter.
+          $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not a participant of this conversation.
           $ref: "#/components/responses/Forbidden"
         '404':
+          description: Conversation not found.
           $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
     post:
+      tags:
+        - Messages
       summary: Send new message
       description: Send a new text or photo message within a conversation.
       operationId: sendMessage
-      tags: [Messages]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
       requestBody:
         required: true
         content:
@@ -650,24 +741,15 @@ paths:
                   type: string
                   description: Text content of the message.
                   example: "Hello everyone"
-                  minLength: 0
-                  maxLength: 4096
-                  pattern: '^[\s\S]*$'
                 photoUrl:
                   type: string
                   format: uri
                   description: URL of a photo to attach to the message.
                   example: "https://example.com/pic.jpg"
-                  minLength: 0
-                  maxLength: 2048
-                  pattern: '^$|https?://.+$'
                 replyToMessageId:
                   type: string
                   description: Identifier of the message being replied to, if any.
                   example: "msg000"
-                  minLength: 0
-                  maxLength: 64
-                  pattern: '^$|[A-Za-z0-9_-]+$'
               anyOf:
                 - required: ["text"]
                 - required: ["photoUrl"]
@@ -679,13 +761,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/Message"
         '400':
+          description: Invalid JSON or missing required content (text or photoUrl).
           $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not a participant of this conversation.
           $ref: "#/components/responses/Forbidden"
         '404':
+          description: Conversation not found.
           $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
   /conversations/{conversationId}/messages/{messageId}:
     parameters:
@@ -696,7 +783,10 @@ paths:
       summary: Get a specific message
       description: Retrieve a single message from a conversation by its identifier.
       operationId: getMessageById
-      tags: [Messages]
+      tags:
+        - Messages
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Message retrieved successfully.
@@ -704,66 +794,94 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
+        '400':
+          description: Missing conversation or message ID.
+          $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not a participant of the conversation.
           $ref: "#/components/responses/Forbidden"
         '404':
+          description: Conversation or message not found.
           $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
     post:
+      tags:
+        - Messages
       summary: Forward a message
-      description: Forward an existing message to another conversation.
+      description: >
+        Forward an existing message to another conversation.
+        A new message is created in the target conversation with the same content (text/photo).
+        The user must be a participant of both the source and target conversations.
       operationId: forwardMessage
-      tags: [Messages]
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              description: Payload indicating the target conversation for forwarding.
+              description: Payload indicating the target conversation.
               properties:
                 targetConversationId:
                   type: string
-                  description: Identifier of the conversation to forward the message to.
+                  description: ID of the conversation to forward the message to.
                   example: "conv456"
                   minLength: 1
                   maxLength: 64
-                  pattern: '^[A-Za-z0-9_-]+$'
-              required: [targetConversationId]
+              required:
+                - targetConversationId
       responses:
         '201':
-          description: Message forwarded successfully.
+          description: Message forwarded successfully (returns the new message).
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Message"
         '400':
+          description: Invalid JSON or missing targetConversationId.
           $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not a participant of the source or target conversation.
           $ref: "#/components/responses/Forbidden"
         '404':
+          description: Source conversation or message not found.
           $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
     delete:
-      summary: Delete a sent message
-      description: Delete a message previously sent by the authenticated user.
+      tags:
+        - Messages
+      summary: Delete a message
+      description: >
+        Delete a message previously sent.
+        **Restriction:** A user can only delete messages they sent themselves.
       operationId: deleteMessage
-      tags: [Messages]
+      security:
+        - bearerAuth: []
       responses:
         '204':
           description: Message deleted successfully.
         '400':
+          description: Missing conversation or message ID.
           $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not the sender of this message or not in the conversation.
           $ref: "#/components/responses/Forbidden"
         '404':
+          description: Conversation or message not found.
           $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
   /conversations/{conversationId}/messages/{messageId}/reactions:
     parameters:
@@ -771,65 +889,81 @@ paths:
       - $ref: "#/components/parameters/MessageId"
 
     get:
+      tags:
+        - Messages
       summary: List reactions for a message
       description: Retrieve all reactions added to a specific message.
       operationId: listReactionsForMessage
-      tags: [Messages]
+      security:
+        - bearerAuth: []
       responses:
         '200':
-          description: Reactions retrieved successfully.
+          description: Reactions retrieved successfully. Returns an empty list if the message has no reactions or does not exist.
           content:
             application/json:
               schema:
                 type: array
-                description: Array of reactions on the message.
-                minItems: 0
-                maxItems: 100
+                description: Array of reactions.
                 items:
                   $ref: "#/components/schemas/Reaction"
+        '400':
+          description: Missing conversation or message ID.
+          $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not in the conversation.
           $ref: "#/components/responses/Forbidden"
-        '404':
-          $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
     post:
-      summary: Add a reaction
-      description: Add a reaction (comment) to a specific message in a conversation.
-      operationId: commentMessage
-      tags: [Messages]
+      tags:
+        - Messages
+      summary: Add or update a reaction
+      description: >
+        Add a reaction to a specific message.
+        **Note:** If the user has already reacted to this message, the existing reaction
+        will be updated with the new emoji (a user can only have one reaction per message).
+      operationId: addReactionToMessage
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              description: Payload specifying the emoji to react with.
+              description: Payload specifying the emoji.
               properties:
                 emoji:
                   type: string
-                  description: Emoji to attach as a reaction.
+                  description: Emoji to attach.
                   example: "👍"
                   minLength: 1
                   maxLength: 8
-                  pattern: '^.+$'
-              required: [emoji]
+              required:
+                - emoji
       responses:
         '201':
-          description: Reaction added successfully.
+          description: Reaction added or updated successfully.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Reaction"
         '400':
+          description: Invalid JSON or missing emoji.
           $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not in the conversation.
           $ref: "#/components/responses/Forbidden"
         '404':
+          description: Conversation or message not found.
           $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
   /conversations/{conversationId}/messages/{messageId}/reactions/{reactionId}:
     parameters:
@@ -838,80 +972,128 @@ paths:
       - $ref: "#/components/parameters/ReactionId"
 
     delete:
+      tags:
+        - Messages
       summary: Remove a reaction
-      description: Remove a previously added reaction (uncomment) from a message.
-      operationId: uncommentMessage
-      tags: [Messages]
+      description: >
+        Remove a previously added reaction from a message.
+        **Restriction:** A user can only remove their own reactions.
+      operationId: removeReactionFromMessage
+      security:
+        - bearerAuth: []
       responses:
         '204':
           description: Reaction removed successfully.
+        '400':
+          description: Missing conversation, message, or reaction ID.
+          $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not in the conversation.
           $ref: "#/components/responses/Forbidden"
         '404':
+          description: Reaction not found (or belongs to another user).
           $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
           
   /conversations/{conversationId}/users:
     post:
+      tags:
+        - Groups
       summary: Add user to group
-      description: Add an existing user to an existing group.
-      operationId: addToGroup
-      tags: [Groups]
+      description: >
+        Add an existing user to an existing group conversation.
+        Only existing participants can add new members.
+        **Note:** If the user is already in the group, the request succeeds (returns 200) without changes.
+        **Restriction:** Cannot add users to 'direct' (private) conversations.
+      operationId: addUserToGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              description: Payload containing the ID of the user to add.
+              description: Payload containing the user ID to add.
               properties:
                 userId:
                   type: string
-                  description: Identifier of the user to add to the group.
+                  description: Identifier of the user to invite.
                   example: "user789"
                   minLength: 1
                   maxLength: 64
-                  pattern: '^[A-Za-z0-9_-]+$'
-              required: [userId]
+              required:
+                - userId
       responses:
         '200':
-          description: User added to group successfully.
+          description: User added successfully (or was already present). Returns the updated conversation.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Conversation"
         '400':
+          description: Missing conversationId or userId.
           $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: Requester is not a participant of this group.
           $ref: "#/components/responses/Forbidden"
         '404':
+          description: Conversation or Target User not found.
           $ref: "#/components/responses/NotFound"
+        '500':
+          description: Internal Server Error (or attempt to add user to a private chat).
+          $ref: "#/components/responses/InternalServerError"
 
   /conversations/{conversationId}/users/me:
     delete:
+      tags:
+        - Groups
       summary: Leave group
-      description: Remove the authenticated user from the specified group.
+      description: >
+        Remove the authenticated user from the specified group conversation.
+        **Restriction:** This operation fails (403) if attempted on a 'direct' (private) conversation.
       operationId: leaveGroup
-      tags: [Groups]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
       responses:
         '204':
           description: User left the group successfully.
+        '400':
+          description: Missing conversation ID.
+          $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
+        '403':
+          description: Forbidden. The conversation is not a group, or the user is not a participant.
+          $ref: "#/components/responses/Forbidden"
         '404':
+          description: Conversation not found.
           $ref: "#/components/responses/NotFound"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
 
-  /conversation/{conversationId}/name:
-    parameters:
-      - $ref: "#/components/parameters/GroupId"
+  /conversations/{conversationId}/name:
     put:
+      tags:
+        - Groups
       summary: Change group name
-      description: Update the display name of a group conversation.
+      description: >
+        Update the display name of a group conversation.
+        **Restriction:** Only works for group conversations (returns error 500 if attempted on private chats).
       operationId: setGroupName
-      tags: [Groups]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
       requestBody:
         required: true
         content:
@@ -926,8 +1108,9 @@ paths:
                   example: "New Group Name"
                   minLength: 1
                   maxLength: 100
-                  pattern: '^[A-Za-zÀ-ÿ0-9 .''-]{1,100}$'
-              required: [name]
+                  # Se ha eliminado el pattern porque el código Go solo valida longitud.
+              required:
+                - name
       responses:
         '200':
           description: Group name changed successfully.
@@ -936,37 +1119,45 @@ paths:
               schema:
                 $ref: "#/components/schemas/Conversation"
         '400':
+          description: Invalid name length.
           $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not a participant of the group.
           $ref: "#/components/responses/Forbidden"
         '404':
+          description: Conversation not found.
           $ref: "#/components/responses/NotFound"
+        '500':
+          description: Internal Server Error (or attempt to rename private chat).
+          $ref: "#/components/responses/InternalServerError"
 
-  /conversation/{conversationId}/photo:
-    parameters:
-      - $ref: "#/components/parameters/GroupId"
+  /conversations/{conversationId}/photo:
     put:
+      tags:
+        - Groups
       summary: Update group photo
-      description: Upload and set a new group photo.
+      description: >
+        Upload and set a new photo for a group conversation.
+        **Restriction:** Only works for group conversations (returns error 500 if attempted on private chats).
       operationId: setGroupPhoto
-      tags: [Groups]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              description: Multipart form data containing the new group photo file.
+              description: Multipart form data containing the new group photo.
               properties:
                 photoFile:
                   type: string
                   format: binary
-                  description: Binary image file to use as the new group photo.
-                  minLength: 1
-                  maxLength: 10485760
-                  pattern: '^.+$'
+                  description: Binary image file.
               required:
                 - photoFile
       responses:
@@ -977,14 +1168,57 @@ paths:
               schema:
                 $ref: "#/components/schemas/Conversation"
         '400':
+          description: Missing file or invalid form data.
           $ref: "#/components/responses/BadRequest"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
+          description: User is not a participant of the group.
           $ref: "#/components/responses/Forbidden"
-        '415':
-          description: Unsupported media type
+        '404':
+          description: Conversation not found.
+          $ref: "#/components/responses/NotFound"
+        '500':
+          description: Internal Server Error (or attempt to update private chat).
+          $ref: "#/components/responses/InternalServerError"
+  /chats:
+    post:
+      tags:
+        - Conversations
+      summary: Start or retrieve a direct conversation
+      description: >
+        Checks if a direct (one-on-one) conversation already exists with the target user.
+        If it exists, returns it. If not, creates a new one and returns it.
+      operationId: createPrivateConversation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Payload containing the target user ID.
+              properties:
+                targetUserId:
+                  type: string
+                  description: The ID of the user you want to talk to.
+                  example: "user456"
+                  minLength: 1
+                  maxLength: 64
+              required:
+                - targetUserId
+      responses:
+        '200':
+          description: Conversation retrieved or created successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/Conversation"
+        '500':
+          description: Internal Server Error (Database error or invalid input).
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Error"

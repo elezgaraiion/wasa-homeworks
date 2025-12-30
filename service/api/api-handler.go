@@ -15,7 +15,6 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.GET("/conversations/:conversationId", rt.getConversationProfile)
 	rt.router.POST("/conversations/:conversationId/seen", rt.markConversationSeen)
 	rt.router.GET("/conversations/:conversationId/messages", rt.listConversationMessages)
-	rt.router.POST("/chats", rt.createPrivateConversation)
 	rt.router.POST("/conversations/:conversationId/messages", rt.sendMessage)
 	rt.router.GET("/conversations/:conversationId/messages/:messageId", rt.getMessageById)
 	rt.router.POST("/conversations/:conversationId/messages/:messageId", rt.forwardMessage)
@@ -27,5 +26,6 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.DELETE("/conversations/:conversationId/users/me", rt.leaveGroup)
 	rt.router.PUT("/conversations/:conversationId/name", rt.setGroupName)
 	rt.router.PUT("/conversations/:conversationId/photo", rt.setGroupPhoto)
+	rt.router.POST("/chats", rt.createPrivateConversation)
 	return rt.router
 }

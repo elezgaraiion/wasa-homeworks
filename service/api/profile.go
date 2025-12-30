@@ -20,11 +20,9 @@ func (rt *_router) doGetCurrentUser(w http.ResponseWriter, r *http.Request, _ ht
         return
     }
 
-
-
     user, err := rt.db.GetUserByID(userID)
     if err != nil {
-        http.Error(w, "user not found", http.StatusUnauthorized)
+        http.Error(w, "user not found", http.StatusNotFound)
         return
     }
 

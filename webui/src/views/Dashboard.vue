@@ -19,8 +19,8 @@
           width="120" 
           class="placeholder-img"
         />
-        <h2>Tu Perfil</h2>
-        <p>Actualiza tu foto y tu nombre en el panel izquierdo.</p>
+        <h2>Your Profile</h2>
+        <p>Update your photo and name in the left panel.</p>
       </div>
 
       <ChatWindow 
@@ -35,8 +35,8 @@
           class="placeholder-img"
         />
         <h2>WASA Web</h2>
-        <p>Envía y recibe mensajes sin conectar tu teléfono.</p>
-        <p class="encrypted-text">🔒 Cifrado de extremo a extremo (mentira, es un proyecto de clase)</p>
+        <p>Send and receive messages without connecting your phone.</p>
+        <p class="encrypted-text">🔒 End-to-end encryption (lie, it's a class project)</p>
       </div>
 
     </main>

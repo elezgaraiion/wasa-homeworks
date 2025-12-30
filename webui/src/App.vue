@@ -2,7 +2,7 @@
   <div id="app-root">
     <div v-if="isLoading" class="loading-screen">
       <div class="spinner"></div>
-      <p>Conectando con WASA...</p>
+      <p>Connecting to WASA...</p>
     </div>
 
     <div v-else>
@@ -38,7 +38,7 @@ onMounted(async () => {
       store.login(user, token);
       
     } catch (e) {
-      console.error("Token inválido o error de red:", e);
+      console.error("Invalid token or network error:", e);
       store.logout(); 
     }
   }

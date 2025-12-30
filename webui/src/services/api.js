@@ -64,9 +64,10 @@ export async function updatePhoto(file) {
     body: formData
   });
 
-  if (!response.ok) throw new Error('Error al subir la imagen');
+  if (!response.ok) throw new Error('Error uploading image');
   return response.json();
 }
+
 export async function searchUsers(query) {
   const queryString = query ? `?q=${encodeURIComponent(query)}` : '';
   return request(`/users${queryString}`);
@@ -75,12 +76,14 @@ export async function searchUsers(query) {
 export async function getConversationMessages(conversationId) {
   return request(`/conversations/${conversationId}/messages?limit=50&_t=${Date.now()}`);
 }
+
 export async function createPrivateChat(targetUserId) {
   return request('/chats', {
     method: 'POST',
     body: JSON.stringify({ targetUserId })
   });
 }
+
 export async function sendMessage(chatId, text, replyToMessageId = null) {
   const payload = { 
       text: text,
@@ -92,31 +95,37 @@ export async function sendMessage(chatId, text, replyToMessageId = null) {
     body: JSON.stringify(payload)
   });
 }
+
 export async function getChatInfo(conversationId) {
   return request(`/conversations/${conversationId}`);
 }
+
 export async function markChatAsRead(conversationId) {
   return request(`/conversations/${conversationId}/seen`, {
     method: 'POST'
   });
 }
+
 export async function createGroup(name, userIds) {
   return request('/conversations', {
     method: 'POST',
     body: JSON.stringify({ name: name, users: userIds })
   });
 }
+
 export async function forwardMessage(sourceChatId, messageId, targetChatId) {
   return request(`/conversations/${sourceChatId}/messages/${messageId}`, {
     method: 'POST',
     body: JSON.stringify({ targetConversationId: targetChatId })
   });
 }
+
 export async function deleteMessage(chatId, messageId) {
   return request(`/conversations/${chatId}/messages/${messageId}`, {
     method: 'DELETE'
   });
 }
+
 export async function addReaction(chatId, messageId, emoji) {
   return request(`/conversations/${chatId}/messages/${messageId}/reactions`, {
     method: 'POST',
@@ -129,6 +138,7 @@ export async function removeReaction(chatId, messageId, reactionId) {
     method: 'DELETE'
   });
 }
+
 export async function addUserToGroup(conversationId, userId) {
   return request(`/conversations/${conversationId}/users`, {
       method: 'POST',

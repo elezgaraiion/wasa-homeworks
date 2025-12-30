@@ -3,7 +3,7 @@
     <div class="search-card">
       
       <div class="card-header">
-        <h2>Usuarios</h2>
+        <h2>Users</h2>
         <button class="btn-close" @click="$emit('close')">✕</button>
       </div>
 
@@ -13,16 +13,16 @@
           ref="inputRef"
           v-model="query" 
           type="text" 
-          placeholder="Busca un usuario..." 
+          placeholder="Search for a user..." 
           class="modern-input"
         />
       </div>
 
       <div class="users-list-wrapper">
-        <div v-if="loading" class="status-msg">Buscando...</div>
+        <div v-if="loading" class="status-msg">Searching...</div>
         
         <div v-else-if="users.length === 0" class="status-msg">
-          {{ query ? 'No hay resultados' : 'Escribe un nombre...' }}
+          {{ query ? 'No results' : 'Type a name...' }}
         </div>
 
         <div 
@@ -57,7 +57,6 @@ import { ref, watch, onMounted, nextTick } from 'vue';
 import { searchUsers } from '../services/api';
 import UserProfileReadOnly from './UserProfileReadOnly.vue';
 
-// AÑADIMOS 'chatStarted' A LOS EVENTOS QUE PODEMOS EMITIR
 const emit = defineEmits(['close', 'chatStarted']); 
 
 const query = ref('');
@@ -89,18 +88,14 @@ function inspectUser(user) {
   selectedUser.value = user;
 }
 
-// NUEVA FUNCIÓN: Recibe el chat creado por el hijo y lo manda al padre (ConversationList)
 function handleChatStarted(chat) {
-  // 1. Pasamos el chat a ConversationList
   emit('chatStarted', chat);
   
-  // 2. Cerramos el buscador entero porque ya vamos al chat
   emit('close'); 
 }
 </script>
 
 <style scoped>
-/* TUS ESTILOS SE MANTIENEN IGUAL */
 .modal-backdrop {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);

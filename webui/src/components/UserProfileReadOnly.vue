@@ -14,14 +14,14 @@
 
       <div class="info-section">
         <h3 class="user-name">{{ user.name || user.Name }}</h3>
-        <p class="user-bio">¡Hola! Estoy usando Wasa Web.</p>
+        <p class="user-bio">Hi! I am using Wasa Web.</p>
       </div>
 
       <div class="actions">
         <button class="btn-chat" @click="handleEnterChat" :disabled="loading">
           <span v-if="loading" class="spinner-mini"></span>
           <span v-else class="icon">💬</span> 
-          {{ loading ? 'Abriendo...' : 'Enviar Mensaje' }}
+          {{ loading ? 'Opening...' : 'Send Message' }}
         </button>
       </div>
 
@@ -47,7 +47,7 @@ async function handleEnterChat() {
     
     emit('close');
   } catch (e) {
-    alert("Error al abrir chat: " + e.message);
+    alert("Error opening chat: " + e.message);
   } finally {
     loading.value = false;
   }
@@ -55,7 +55,6 @@ async function handleEnterChat() {
 </script>
 
 <style scoped>
-/* (Estilos igual que antes) */
 .profile-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 10001; display: flex; justify-content: center; align-items: center; }
 .profile-card { width: 320px; background: #111b21; border-radius: 16px; padding: 2rem; display: flex; flex-direction: column; align-items: center; gap: 1.5rem; border: 1px solid #333; }
 .card-header { width: 100%; display: flex; justify-content: flex-end; }

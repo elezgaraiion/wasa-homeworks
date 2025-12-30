@@ -2,12 +2,12 @@
   <div class="modal-backdrop" @click.self="$emit('close')">
     <div class="forward-card">
       <div class="card-header">
-        <h2>Reenviar mensaje a...</h2>
+        <h2>Forward message to...</h2>
         <button class="btn-close" @click="$emit('close')">✕</button>
       </div>
 
       <div class="chats-list">
-        <div v-if="loading" class="status">Cargando chats...</div>
+        <div v-if="loading" class="status">Loading chats...</div>
         
         <div 
           v-else 
@@ -18,7 +18,7 @@
         >
           <img :src="chat.photo || DEFAULT_AVATAR" class="chat-avatar"/>
           <div class="chat-name">{{ chat.name || chat.Name }}</div>
-          <button class="btn-send">Enviar</button>
+          <button class="btn-send">Send</button>
         </div>
       </div>
     </div>
@@ -48,18 +48,18 @@ onMounted(async () => {
 });
 
 async function handleForward(targetChat) {
-  if (!confirm(`¿Reenviar a ${targetChat.name}?`)) return;
+  if (!confirm(`Forward to ${targetChat.name}?`)) return;
   
   try {
     const msgId = props.message.id || props.message.ID;
     
     await forwardMessage(props.sourceChatId, msgId, targetChat.id);
     
-    alert("Mensaje reenviado");
+    alert("Message forwarded");
     emit('forwarded'); 
     emit('close');
   } catch (e) {
-    alert("Error al reenviar: " + e.message);
+    alert("Error forwarding: " + e.message);
   }
 }
 </script>

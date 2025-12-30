@@ -23,11 +23,11 @@
                     @keyup.enter="saveName"
                     ref="nameInput"
                     class="name-input"
-                    placeholder="Nuevo nombre..."
+                    placeholder="New name..."
                 />
                 <div class="edit-actions">
-                    <button @click="saveName" class="btn-confirm">Confirmar</button>
-                    <button @click="isEditingName = false" class="btn-cancel">Cancelar</button>
+                    <button @click="saveName" class="btn-confirm">Confirm</button>
+                    <button @click="isEditingName = false" class="btn-cancel">Cancel</button>
                 </div>
             </div>
 
@@ -39,19 +39,19 @@
         </div>
         
         <p class="participants-count" v-if="isGroup">
-            {{ participantsList.length }} participantes
+            {{ participantsList.length }} participants
         </p>
       </div>
 
       <hr class="divider" />
 
       <div v-if="isGroup" class="add-section">
-        <h3>Añadir participantes</h3>
+        <h3>Add participants</h3>
         <input 
             v-model="searchQuery" 
             @input="handleSearch" 
             type="text" 
-            placeholder="Buscar usuarios por nombre..." 
+            placeholder="Search users by name..." 
             class="search-input"
         />
 
@@ -60,17 +60,17 @@
                 <img :src="user.photo || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" class="user-avatar-small" />
                 <span class="user-name">{{ user.name }}</span>
                 
-                <button v-if="isAlreadyMember(user.id)" class="btn-member" disabled>Ya es miembro</button>
-                <button v-else class="btn-add" @click="addToGroup(user)">Añadir</button>
+                <button v-if="isAlreadyMember(user.id)" class="btn-member" disabled>Already a member</button>
+                <button v-else class="btn-add" @click="addToGroup(user)">Add</button>
             </div>
         </div>
         <div v-else-if="searchQuery.length > 2" class="no-results">
-            No se encontraron usuarios.
+            No users found.
         </div>
       </div>
 
       <div v-if="isGroup" class="danger-zone">
-        <button class="btn-leave" @click="handleLeaveGroup">Salir del grupo</button>
+        <button class="btn-leave" @click="handleLeaveGroup">Leave group</button>
       </div>
 
     </div>
@@ -128,8 +128,8 @@ async function addToGroup(user) {
         searchQuery.value = '';
         searchResults.value = [];
         emit('chatUpdated'); 
-        alert(`${user.name} añadido.`);
-    } catch (e) { alert("Error al añadir usuario."); }
+        alert(`${user.name} added.`);
+    } catch (e) { alert("Error adding user."); }
 }
 
 function startEditingName() {
@@ -148,7 +148,7 @@ async function saveName() {
         emit('chatUpdated', { type: 'name', value: updated.name });
         
     } catch (e) {
-        alert("Error al cambiar el nombre.");
+        alert("Error changing name.");
     }
 }
 
@@ -161,17 +161,17 @@ async function handlePhotoChange(event) {
         localChat.value.photo = newPhotoUrl;
         
         emit('chatUpdated', { type: 'photo', value: newPhotoUrl });
-    } catch (e) { alert("Error al subir la foto."); }
+    } catch (e) { alert("Error uploading photo."); }
 }
 
 async function handleLeaveGroup() {
-    if(!confirm("¿Estás seguro de que quieres salir?")) return;
+    if(!confirm("Are you sure you want to leave?")) return;
     try {
         await leaveGroup(props.chatId);
         emit('chatUpdated');
         emit('close');
         window.location.reload(); 
-    } catch (e) { alert("Error al salir."); }
+    } catch (e) { alert("Error leaving."); }
 }
 </script>
 
@@ -180,14 +180,12 @@ async function handleLeaveGroup() {
 .modal-content { background: #202c33; width: 400px; max-height: 90vh; overflow-y: auto; border-radius: 12px; padding: 20px; position: relative; color: #e9edef; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border: 1px solid #374045; }
 .close-btn { position: absolute; top: 10px; right: 15px; background: none; border: none; color: #aebac1; font-size: 1.5rem; cursor: pointer; }
 
-/* CABECERA */
 .group-header { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 20px; }
 .photo-container { position: relative; width: 120px; height: 120px; }
 .group-avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid #00a884; }
 .edit-photo-btn { position: absolute; bottom: 5px; right: 5px; background: #00a884; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.4); font-size: 1.1rem; transition: transform 0.2s; }
 .edit-photo-btn:hover { transform: scale(1.1); }
 
-/* ESTILOS DE EDICIÓN DE NOMBRE */
 .name-container { width: 100%; display: flex; justify-content: center; min-height: 40px; }
 
 .view-mode-wrapper { display: flex; align-items: center; gap: 10px; }
@@ -208,7 +206,6 @@ async function handleLeaveGroup() {
 
 .divider { border: 0; border-top: 1px solid #374045; margin: 20px 0; }
 
-/* SECCIÓN AÑADIR */
 .add-section h3 { margin-bottom: 15px; font-size: 1rem; color: #00a884; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
 .search-input { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #2a3942; color: white; margin-bottom: 15px; outline: none; font-size: 0.95rem; }
 .search-input:focus { box-shadow: 0 0 0 2px #00a884; }

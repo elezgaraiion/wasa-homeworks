@@ -6,7 +6,7 @@
         <img :src="chat.photo || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" class="header-avatar" />
         <div class="header-info">
           <span class="header-name">{{ chat.name || chat.Name || 'Chat' }}</span>
-          <span class="header-status">{{ chat.type === 'group' ? 'Grupo' : 'en línea' }}</span>
+          <span class="header-status">{{ chat.type === 'group' ? 'Group' : 'online' }}</span>
         </div>
       </div>
       <div class="header-actions"><span>🔍</span><span>⋮</span></div>
@@ -14,7 +14,7 @@
 
     <div class="messages-area" ref="messagesContainer">
       <div v-if="loading && messages.length === 0" class="loading-msgs"><div class="spinner-small"></div></div>
-      <div v-else-if="messages.length === 0" class="empty-chat"><span class="empty-badge">No hay mensajes.</span></div>
+      <div v-else-if="messages.length === 0" class="empty-chat"><span class="empty-badge">No messages.</span></div>
 
       <div 
         v-else 
@@ -32,9 +32,9 @@
           </div>
 
           <div v-if="msg.replyTo || msg.ReplyTo" class="reply-quote-block">
-            <span class="reply-sender-name">{{ msg.replyTo?.sender?.name || msg.ReplyTo?.Sender?.Name || 'Usuario' }}</span>
+            <span class="reply-sender-name">{{ msg.replyTo?.sender?.name || msg.ReplyTo?.Sender?.Name || 'User' }}</span>
             <div class="reply-preview-content">
-                <span v-if="msg.replyTo?.photo || msg.ReplyTo?.Photo">📷 Foto</span>
+                <span v-if="msg.replyTo?.photo || msg.ReplyTo?.Photo">📷 Photo</span>
                 <span>{{ msg.replyTo?.text || msg.ReplyTo?.Text || '...' }}</span>
             </div>
           </div>
@@ -71,10 +71,10 @@
           <div class="msg-options-btn" @click.stop="toggleMenu(msg.id || msg.ID)">⌄</div>
 
           <div v-if="activeMenuMessageId === (msg.id || msg.ID)" class="msg-dropdown">
-            <div class="dropdown-item" @click.stop="openReactionModal(msg)">😀 Reaccionar</div>
-            <div class="dropdown-item" @click="startReply(msg)">↩ Responder</div>
-            <div class="dropdown-item" @click="openForwardModal(msg)">↪ Reenviar</div>
-            <div v-if="isMe(msg)" class="dropdown-item delete-item" @click="handleDelete(msg)">🗑 Eliminar</div>
+            <div class="dropdown-item" @click.stop="openReactionModal(msg)">😀 React</div>
+            <div class="dropdown-item" @click="startReply(msg)">↩ Reply</div>
+            <div class="dropdown-item" @click="openForwardModal(msg)">↪ Forward</div>
+            <div v-if="isMe(msg)" class="dropdown-item delete-item" @click="handleDelete(msg)">🗑 Delete</div>
           </div>
         </div>
       </div>
@@ -83,14 +83,14 @@
     <footer class="chat-footer">
       <div v-if="replyingToMessage" class="reply-preview-bar">
         <div class="reply-info">
-            <span class="reply-target-name">Respondiendo a {{ replyingToMessage.sender?.name || replyingToMessage.Sender?.Name }}</span>
-            <p class="reply-target-text">{{ replyingToMessage.text || replyingToMessage.Text || (replyingToMessage.photo ? '📷 Foto' : '...') }}</p>
+            <span class="reply-target-name">Replying to {{ replyingToMessage.sender?.name || replyingToMessage.Sender?.Name }}</span>
+            <p class="reply-target-text">{{ replyingToMessage.text || replyingToMessage.Text || (replyingToMessage.photo ? '📷 Photo' : '...') }}</p>
         </div>
         <button class="close-reply-btn" @click="cancelReply">✕</button>
       </div>
       <div class="input-container">
         <div class="input-wrapper">
-            <input v-model="newMessage" @keyup.enter="handleSend" type="text" placeholder="Escribe un mensaje..." :disabled="sending" ref="inputRef" />
+            <input v-model="newMessage" @keyup.enter="handleSend" type="text" placeholder="Type a message..." :disabled="sending" ref="inputRef" />
         </div>
         <span class="footer-icon send-btn" @click="handleSend" :class="{ 'disabled': !newMessage.trim() }">➤</span>
       </div>
@@ -109,7 +109,7 @@
       
       <div v-if="msgToReact" class="modal-overlay" @click="closeReactionModal">
         <div class="reaction-modal" @click.stop>
-            <h3>Elige una reacción</h3>
+            <h3>Choose a reaction</h3>
             <div class="reaction-grid">
                 <button 
                     v-for="emoji in availableEmojis" 
@@ -120,7 +120,7 @@
                     {{ emoji }}
                 </button>
             </div>
-            <button class="close-modal-btn" @click="closeReactionModal">Cancelar</button>
+            <button class="close-modal-btn" @click="closeReactionModal">Cancel</button>
         </div>
       </div>
     </Teleport>
@@ -267,7 +267,7 @@ async function addReactionInternal(msg, emoji) {
         }
     } catch (e) {
         console.error(e);
-        alert("Error al reaccionar");
+        alert("Error reacting");
     }
 }
 
@@ -291,7 +291,7 @@ window.addEventListener('click', () => {
 function openForwardModal(msg) { msgToForward.value = msg; activeMenuMessageId.value = null; }
 function handleForwardedSuccess() {msgToForward.value = null; loadMessages(true);}
 async function handleDelete(msg) {
-    if (!confirm("¿Eliminar?")) return;
+    if (!confirm("Delete?")) return;
     activeMenuMessageId.value = null;
     try {
         await deleteMessage(props.chat.id, msg.id || msg.ID);
@@ -329,7 +329,7 @@ async function loadMessages(isBackgroundUpdate = false) {
             const localMsg = messages.value.find(m => (m.id || m.ID) === (serverMsg.id || serverMsg.ID));
             if (localMsg && localMsg.reactions && localMsg.reactions.length > 0) {
                 if (!serverMsg.reactions || serverMsg.reactions.length === 0) {
-                     serverMsg.reactions = localMsg.reactions;
+                      serverMsg.reactions = localMsg.reactions;
                 }
             } else if (!serverMsg.reactions) {
                 serverMsg.reactions = [];
@@ -367,7 +367,6 @@ watch(() => props.chat.id, () => {
 </script>
 
 <style scoped>
-/* ESTILOS CLÁSICOS... */
 .chat-header { height: 60px; background-color: #202c33; padding: 0 16px; display: flex; align-items: center; border-left: 1px solid #333; flex-shrink: 0; cursor: pointer; transition: background 0.2s; }
 .chat-window { display: flex; flex-direction: column; height: 100%; width: 100%; background-color: #0b141a; }
 .header-left { display: flex; align-items: center; }
@@ -468,7 +467,6 @@ watch(() => props.chat.id, () => {
     opacity: 0.9;
 }
 
-/* MODAL OSCURO */
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 9999; }
 .reaction-modal { background: #233138; padding: 25px; border-radius: 16px; width: 320px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.7); animation: popIn 0.2s; border: 1px solid #333; }
 .reaction-modal h3 { color: #e9edef; margin-top: 0; margin-bottom: 20px; font-size: 1.2rem; font-weight: 500; }

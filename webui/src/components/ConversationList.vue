@@ -2,7 +2,7 @@
   <div class="sidebar">
     
     <header class="sidebar-header">
-      <div class="user-profile-section" @click="$emit('openProfile')" title="Editar mi perfil">
+      <div class="user-profile-section" @click="$emit('openProfile')" title="Edit my profile">
         <img :src="avatarUrl" @error="handleImageError" class="user-avatar" alt="Avatar" />
         <div class="my-info">
           <span class="my-name">{{ userName }}</span>
@@ -10,21 +10,21 @@
       </div>
       
       <div class="header-actions">
-        <span class="icon" @click="showGroupModal = true" title="Nuevo Grupo">➕👥</span>
-        <span class="icon logout-btn" @click.stop="handleLogout" title="Cerrar Sesión">🚪</span>
+        <span class="icon" @click="showGroupModal = true" title="New Group">➕👥</span>
+        <span class="icon logout-btn" @click.stop="handleLogout" title="Log Out">🚪</span>
       </div>
     </header>
 
     <div class="search-bar">
       <div class="search-input-wrapper" @click="showSearchModal = true">
         <span class="search-icon">🔍</span>
-        <span class="fake-input-text">Buscar usuarios</span>
+        <span class="fake-input-text">Search users</span>
       </div>
     </div>
 
     <div class="chats-container">
-      <div v-if="loading && conversations.length === 0" class="state-msg">Cargando...</div>
-      <div v-else-if="conversations.length === 0" class="state-msg"><p>No tienes conversaciones.</p></div>
+      <div v-if="loading && conversations.length === 0" class="state-msg">Loading...</div>
+      <div v-else-if="conversations.length === 0" class="state-msg"><p>You have no conversations.</p></div>
       <div v-else v-for="chat in conversations" :key="chat.id" class="chat-item" :class="{ active: selectedChatId === chat.id }" @click="selectChat(chat)">
         <img :src="chat.photo || DEFAULT_AVATAR" @error="handleImageError" class="chat-avatar" />
         <div class="chat-info">
@@ -81,7 +81,7 @@ const showSearchModal = ref(false);
 const showGroupModal = ref(false); 
 let refreshInterval = null;
 
-const userName = computed(() => store.currentUser?.name || store.currentUser?.Name || 'Usuario');
+const userName = computed(() => store.currentUser?.name || store.currentUser?.Name || 'User');
 const avatarUrl = computed(() => store.currentUser?.photo || store.currentUser?.Photo || DEFAULT_AVATAR);
 
 function handleImageError(e) { e.target.src = DEFAULT_AVATAR; }
@@ -105,7 +105,7 @@ function formatTime(dateStr) {
 }
 
 function handleLogout() {
-  if (confirm('¿Cerrar sesión?')) store.logout();
+  if (confirm('Log out?')) store.logout();
 }
 
 async function loadConversations() {
@@ -149,10 +149,8 @@ defineExpose({ refreshList: loadConversations });
 </script>
 
 <style scoped>
-/* AÑADIDO UN MARGEN ENTRE ICONOS */
 .header-actions { display: flex; gap: 20px; align-items: center; } 
 
-/* (El resto de estilos es IDÉNTICO, solo asegúrate de tener el css previo) */
 .sidebar { display: flex; flex-direction: column; height: 100%; background-color: #111b21; border-right: 1px solid #2f3b43; color: #e9edef; position: relative; }
 .sidebar-header { height: 60px; background-color: #202c33; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .user-profile-section { display: flex; align-items: center; cursor: pointer; padding: 5px; border-radius: 8px; max-width: 80%; transition: 0.2s; }

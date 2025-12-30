@@ -6,7 +6,6 @@ import (
 )
 
 func (db *appdbimpl) MarkConversationSeen(userID, convID string) error {
-	// 1. Validar acceso
 	var count int
 	err := db.c.QueryRow(`
 		SELECT COUNT(*) 
@@ -21,10 +20,8 @@ func (db *appdbimpl) MarkConversationSeen(userID, convID string) error {
 		return errors.New("forbidden")
 	}
 
-	// 2. Definir fecha (Ahora + 5 seg) para asegurar que supera al mensaje
 	nowStr := time.Now().UTC().Add(5 * time.Second).Format(time.RFC3339)
 
-	// 3. ACTUALIZAR METADATOS (Registrar que YO he visto el chat)
 	res, err := db.c.Exec(`
 		UPDATE conversation_user_meta 
 		SET last_seen_message_at = ?
@@ -34,15 +31,10 @@ func (db *appdbimpl) MarkConversationSeen(userID, convID string) error {
 
 	rows, _ := res.RowsAffected()
 	if rows == 0 {
-		// Si no existía fila, la creamos
 		db.c.Exec(`INSERT INTO conversation_user_meta (conversation_id, user_id, last_seen_message_at, joined_at) VALUES (?, ?, ?, ?)`, convID, userID, nowStr, nowStr)
 	}
 
-	// 4. LÓGICA DE GRUPO (TICKS AZULES)
-	// Esta Query hace lo siguiente:
-	// Actualiza a 'read' los mensajes de este chat QUE ESTÉN EN 'delivered'
-	// SIEMPRE Y CUANDO NO EXISTA ningún participante (excluyendo al sender)
-	// que tenga un 'last_seen_message_at' anterior a la fecha del mensaje.
+	
 	
 	query := `
 		UPDATE messages

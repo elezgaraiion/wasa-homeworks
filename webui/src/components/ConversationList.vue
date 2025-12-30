@@ -69,7 +69,6 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { getConversations } from '../services/api'; 
 import { store } from '../store.js'; 
 import UserSearchModal from './UserSearchModal.vue'; 
-// IMPORTAMOS EL NUEVO MODAL
 import CreateGroupModal from './CreateGroupModal.vue';
 
 const DEFAULT_AVATAR = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
@@ -79,7 +78,6 @@ const conversations = ref([]);
 const loading = ref(true);
 const selectedChatId = ref(null);
 const showSearchModal = ref(false);
-// VARIABLE NUEVA
 const showGroupModal = ref(false); 
 let refreshInterval = null;
 
@@ -121,10 +119,9 @@ async function loadConversations() {
   }
 }
 
-// ESTA FUNCIÓN NOS VALE TANTO PARA CHAT PRIVADO COMO PARA GRUPO
 async function onChatCreated(chat) {
   showSearchModal.value = false;
-  showGroupModal.value = false; // Cerramos también el de grupos
+  showGroupModal.value = false; 
 
   const existing = conversations.value.find(c => c.id === chat.id);
   if (!existing) {

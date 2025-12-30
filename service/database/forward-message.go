@@ -12,7 +12,6 @@ func (db *appdbimpl) ForwardMessage(
 	userID, sourceConvID, messageID, targetConvID string,
 ) (models.Message, error) {
 
-	// 1️⃣ Validar que estoy en la conversación ORIGEN
 	var count int
 	err := db.c.QueryRow(`
 		SELECT COUNT(*) FROM conversation_participants
@@ -25,7 +24,6 @@ func (db *appdbimpl) ForwardMessage(
 		return models.Message{}, models.ErrForbidden
 	}
 
-	// 2️⃣ Validar que estoy en la conversación DESTINO
 	err = db.c.QueryRow(`
 		SELECT COUNT(*) FROM conversation_participants
 		WHERE conversation_id = ? AND user_id = ?
@@ -37,7 +35,6 @@ func (db *appdbimpl) ForwardMessage(
 		return models.Message{}, models.ErrForbidden
 	}
 
-	// 3️⃣ Obtener datos del mensaje original (Texto y Foto)
 	var text sql.NullString
 	var photo sql.NullString
 	err = db.c.QueryRow(`
@@ -52,7 +49,6 @@ func (db *appdbimpl) ForwardMessage(
 		return models.Message{}, err
 	}
 
-	// 4️⃣ INICIAR TRANSACCIÓN
 	tx, err := db.c.Begin()
 	if err != nil { return models.Message{}, err }
 	defer tx.Rollback()
@@ -61,7 +57,6 @@ func (db *appdbimpl) ForwardMessage(
 	now := time.Now().UTC()
 	nowStr := now.Format(time.RFC3339)
 
-	// Insertar el nuevo mensaje (copia)
 	_, err = tx.Exec(`
 		INSERT INTO messages(id, sender_id, conversation_id, text, photo, created_at, status)
 		VALUES (?, ?, ?, ?, ?, ?, 'delivered')
@@ -70,7 +65,6 @@ func (db *appdbimpl) ForwardMessage(
 		return models.Message{}, fmt.Errorf("insert msg: %w", err)
 	}
 
-	// Actualizar portada del chat destino
 	preview := ""
 	if text.Valid { preview = text.String }
 	if preview == "" && photo.Valid && photo.String != "" { preview = "📷 Foto" }
@@ -84,7 +78,6 @@ func (db *appdbimpl) ForwardMessage(
 		return models.Message{}, fmt.Errorf("update conv: %w", err)
 	}
 
-	// Actualizar mi "visto" (UPDATE o INSERT manual para evitar fallos de ON CONFLICT)
 	res, err := tx.Exec(`
 		UPDATE conversation_user_meta 
 		SET last_seen_message_at = ?
@@ -101,13 +94,10 @@ func (db *appdbimpl) ForwardMessage(
 		if err != nil { return models.Message{}, err }
 	}
 
-	// COMMIT
 	if err := tx.Commit(); err != nil {
 		return models.Message{}, err
 	}
 
-	// 5️⃣ Devolver el mensaje creado (Construcción manual para ser más rápido)
-	// Recuperamos nombre del sender (yo mismo)
 	var myName string
 	db.c.QueryRow("SELECT name FROM users WHERE id = ?", userID).Scan(&myName)
 

@@ -74,15 +74,13 @@ const emit = defineEmits(['close', 'groupCreated']);
 
 const DEFAULT_AVATAR = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
 
-// Estados
 const groupName = ref('');
 const query = ref('');
 const searchResults = ref([]);
-const selectedUsers = ref([]); // Array de objetos usuario completos
+const selectedUsers = ref([]); 
 const loading = ref(false);
 const creating = ref(false);
 
-// BUSCADOR (Igual que en UserSearchModal)
 watch(query, async (newVal) => {
   if (!newVal.trim()) {
     searchResults.value = [];
@@ -98,16 +96,15 @@ watch(query, async (newVal) => {
   }
 });
 
-// LÓGICA DE SELECCIÓN
 function isSelected(userId) {
   return selectedUsers.value.some(u => (u.id || u.ID) === userId);
 }
 
 function selectUser(user) {
   const uid = user.id || user.ID;
-  if (isSelected(uid)) return; // Ya está seleccionado
+  if (isSelected(uid)) return; 
   selectedUsers.value.push(user);
-  query.value = ''; // Limpiar buscador tras seleccionar
+  query.value = ''; 
   searchResults.value = [];
 }
 
@@ -115,19 +112,15 @@ function removeUser(userId) {
   selectedUsers.value = selectedUsers.value.filter(u => (u.id || u.ID) !== userId);
 }
 
-// CREAR EL GRUPO
 async function handleCreateGroup() {
   if (!groupName.value.trim() || selectedUsers.value.length === 0) return;
   
   creating.value = true;
   try {
-    // Extraemos solo los IDs para la API
     const userIds = selectedUsers.value.map(u => u.id || u.ID);
     
-    // Llamada al Backend
     const newGroupChat = await createGroup(groupName.value, userIds);
     
-    // Éxito: Avisamos al padre
     emit('groupCreated', newGroupChat);
     emit('close');
 

@@ -23,7 +23,6 @@ func (db *appdbimpl) CreateGroup(creatorID string, name string, users []string) 
 	}
 	defer tx.Rollback()
 
-	// 1. Crear la conversación
 	convID := uuid.New().String()
 	_, err = tx.Exec(`
 		INSERT INTO conversations(id, type, name)
@@ -35,7 +34,6 @@ func (db *appdbimpl) CreateGroup(creatorID string, name string, users []string) 
 
 	joinedAt := time.Now().UTC().Format(time.RFC3339)
 
-	// 2. Insertar creador
 	_, err = tx.Exec(`
 		INSERT INTO conversation_participants(conversation_id, user_id)
 		VALUES (?, ?)
@@ -52,10 +50,9 @@ func (db *appdbimpl) CreateGroup(creatorID string, name string, users []string) 
 		return models.Conversation{}, fmt.Errorf("INSERT creator meta: %w", err)
 	}
 
-	// 3. Insertar resto de miembros
 	for _, u := range users {
 		if u == creatorID {
-			continue // evitar añadirte dos veces
+			continue 
 		}
 
 		_, err = tx.Exec(`

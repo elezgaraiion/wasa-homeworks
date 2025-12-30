@@ -8,7 +8,6 @@ import (
 )
 
 func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, error) {
-	// Query mejorada que trae todo lo necesario
 	query := `
 		SELECT 
 			c.id, c.type, c.name, c.photo,
@@ -39,13 +38,11 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, e
 
 	var convs []models.Conversation
 
-	// Formatos de fecha posibles
 	const layoutSQLite = "2006-01-02 15:04:05"
 
 	for rows.Next() {
 		var c models.Conversation
 		
-		// Variables temporales para Scan (manejo de NULLs)
 		var lastMsgAtStr sql.NullString
 		var joinedAtStr sql.NullString
 		var preview sql.NullString
@@ -64,7 +61,6 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, e
 			return nil, err
 		}
 
-		// Asignaciones
 		c.UnreadCount = unreadCount
 		if name.Valid { c.Name = name.String }
 		if photo.Valid { c.Photo = photo.String }
@@ -73,9 +69,7 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, e
 		if msgStatus.Valid { c.LastMessageStatus = msgStatus.String }
 		if senderName.Valid { c.LastMessageSenderName = senderName.String }
 
-		// --- LÓGICA DE FECHAS Y ORDENACIÓN ---
 		
-		// 1. Parsear LastMessageAt
 		var tMsg time.Time
 		if lastMsgAtStr.Valid && lastMsgAtStr.String != "" {
 			t, err := time.Parse(time.RFC3339, lastMsgAtStr.String)
@@ -86,7 +80,6 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, e
 			c.LastMessageAt = t
 		}
 
-		// 2. Parsear JoinedAt
 		var tJoined time.Time
 		if joinedAtStr.Valid && joinedAtStr.String != "" {
 			t, err := time.Parse(time.RFC3339, joinedAtStr.String)
@@ -96,16 +89,13 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, e
 			tJoined = t
 		}
 
-		// 3. Decidir cuál es la fecha "mandataria" para ordenar
-		// Si hay mensaje, suele ser la más reciente.
-		// Si no hay mensaje, usamos la fecha de unión/creación.
+		
 		if tMsg.After(tJoined) {
 			c.TempOrderAt = tMsg
 		} else {
 			c.TempOrderAt = tJoined
 		}
 
-		// --- CARGAR PARTICIPANTES (Para nombre dinámico) ---
 		c.Participants, _ = db.getParticipantsByConversation(c.ID)
 		if c.Type == "direct" {
 			for _, p := range c.Participants {
@@ -120,7 +110,6 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, e
 		convs = append(convs, c)
 	}
 
-	// ORDENACIÓN FINAL EN GO (Descendente: Más nuevo primero)
 	sort.Slice(convs, func(i, j int) bool {
 		return convs[i].TempOrderAt.After(convs[j].TempOrderAt)
 	})

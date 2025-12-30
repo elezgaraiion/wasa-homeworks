@@ -16,9 +16,9 @@ type Conversation struct {
 	LastMessagePreview string    `db:"last_message_preview,omitempty" json:"lastMessagePreview,omitempty"`
 	LastMessageAt      time.Time `db:"last_message_at,omitempty" json:"lastMessageAt,omitempty"`
 	
-	LastMessageSenderID string `json:"lastMessageSenderId"` // Para saber si "fui yo"
-	LastMessageStatus   string `json:"lastMessageStatus"`   // Para los ticks (sent, read)
-	LastMessageSenderName string `json:"lastMessageSenderName"` // Para poner "Luis: Hola..." en grupos
+	LastMessageSenderID string `json:"lastMessageSenderId"` 
+	LastMessageStatus   string `json:"lastMessageStatus"`   
+	LastMessageSenderName string `json:"lastMessageSenderName"` 
 	
     UnreadCount int `json:"unreadCount"`
     

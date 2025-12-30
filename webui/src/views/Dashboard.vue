@@ -55,7 +55,6 @@ const currentChat = ref(null);
 const showProfileEdit = ref(false);
 
 function handleChatSelected(chat) {
-  // RESETEAMOS LA BOLA VERDE AL MOMENTO
   chat.unreadCount = 0;
   
   currentChat.value = chat;

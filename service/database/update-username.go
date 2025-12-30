@@ -7,10 +7,7 @@ import (
 	"github.com/aritz/wasa-homeworks/service/models"
 )
 
-// UpdateUserName cambia el nombre de un usuario por su ID.
-// Devuelve el usuario actualizado o un error si el nombre ya existe o falla la base de datos.
 func (db *appdbimpl) UpdateUserName(id, newName string) (models.User, error) {
-	// Verificar si el nuevo nombre ya existe para otro usuario
 	var exists int
 	err := db.c.QueryRow(`SELECT COUNT(*) FROM users WHERE name = ? AND id != ?`, newName, id).Scan(&exists)
 	if err != nil {
@@ -20,7 +17,6 @@ func (db *appdbimpl) UpdateUserName(id, newName string) (models.User, error) {
 		return models.User{}, errors.New("user with that name already exists")
 	}
 
-	// Actualizar el nombre
 	log.Printf("UpdateUserName called with id=%s, newName=%s", id, newName)
 
 	_, err = db.c.Exec(`UPDATE users SET name = ? WHERE id = ?`, newName, id)

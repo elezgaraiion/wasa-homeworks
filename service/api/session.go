@@ -11,7 +11,6 @@ import (
 )
 
 func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	// 1. Parsear body
 	var req struct {
 		Name string `json:"name"`
 	}
@@ -21,15 +20,12 @@ func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.
 		return
 	}
 
-	// 2. Buscar si existe usuario
 	id, err := rt.db.GetUserIdByName(req.Name)
 	if err == nil {
-		// Existe → devolver solo el ID
 		json.NewEncoder(w).Encode(map[string]string{"identifier": id})
 		return
 	}
 
-	// 3. Crear usuario nuevo
 	newUser := models.User{
 		ID:    uuid.New().String(),
 		Name:  req.Name,
@@ -42,7 +38,6 @@ func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.
 		return
 	}
 
-	// 4. Devolver solo el ID del nuevo usuario
 	json.NewEncoder(w).Encode(map[string]string{"identifier": newUser.ID})
 }
 func (rt *_router) getMyConversations(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -54,7 +49,6 @@ func (rt *_router) getMyConversations(w http.ResponseWriter, r *http.Request, _ 
 
 	convs, err := rt.db.GetMyConversations(userID)
 	if err != nil {
-		// 👇 Log para debug
 		log.Printf("ERROR GetMyConversations (%s): %v\n", userID, err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return

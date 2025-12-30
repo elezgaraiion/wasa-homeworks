@@ -95,7 +95,6 @@ const nameInput = ref(null);
 const searchQuery = ref('');
 const searchResults = ref([]);
 
-// Sincronización inicial
 watch(() => props.chat, (newChat) => {
     if (newChat) {
         localChat.value = { ...newChat };
@@ -128,7 +127,7 @@ async function addToGroup(user) {
         participantsList.value.push(user);
         searchQuery.value = '';
         searchResults.value = [];
-        emit('chatUpdated'); // Avisamos cambios
+        emit('chatUpdated'); 
         alert(`${user.name} añadido.`);
     } catch (e) { alert("Error al añadir usuario."); }
 }
@@ -143,11 +142,9 @@ async function saveName() {
     if (!newName.value.trim()) return;
     try {
         const updated = await setGroupName(props.chatId, newName.value);
-        // 1. Actualizamos localmente para feedback inmediato
         localChat.value.name = updated.name;
         isEditingName.value = false;
         
-        // 2. Avisamos al padre (ChatWindow) pasando el nuevo nombre
         emit('chatUpdated', { type: 'name', value: updated.name });
         
     } catch (e) {
@@ -163,7 +160,6 @@ async function handlePhotoChange(event) {
         const newPhotoUrl = updated.photo + '?t=' + new Date().getTime();
         localChat.value.photo = newPhotoUrl;
         
-        // Avisamos al padre
         emit('chatUpdated', { type: 'photo', value: newPhotoUrl });
     } catch (e) { alert("Error al subir la foto."); }
 }

@@ -40,14 +40,11 @@ const loading = ref(false);
 async function handleEnterChat() {
   loading.value = true;
   try {
-    // 1. LLAMADA A LA API (Asegúrate que createPrivateChat apunta a /chats en api.js)
     const targetId = props.user.id || props.user.ID;
     const chat = await createPrivateChat(targetId);
 
-    // 2. EMITIR EVENTO (Esto es lo que recoge el archivo que me acabas de pasar)
     emit('chatStarted', chat);
     
-    // 3. CERRAR
     emit('close');
   } catch (e) {
     alert("Error al abrir chat: " + e.message);

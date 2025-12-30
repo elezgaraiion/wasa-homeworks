@@ -44,23 +44,19 @@ import { doLogin } from '../services/api';
 
 const emit = defineEmits(['loginSuccess']);
 
-// Estados
-const showInput = ref(false); // Controla la animación
+const showInput = ref(false); 
 const username = ref('');
 const loading = ref(false);
 const error = ref('');
-const inputField = ref(null); // Referencia al input HTML
+const inputField = ref(null); 
 
-// Acción al pulsar "COMENZAR"
 function startInteraction() {
   showInput.value = true;
-  // Enfocamos el input automáticamente cuando baja la animación
   nextTick(() => {
     setTimeout(() => inputField.value?.focus(), 500);
   });
 }
 
-// Acción al pulsar "ENTRAR"
 async function handleLogin() {
   error.value = '';
   if (username.value.trim().length < 3) {
@@ -70,18 +66,13 @@ async function handleLogin() {
 
   loading.value = true;
   try {
-    // 1. Llamamos a tu Backend (Go)
     const data = await doLogin(username.value.trim());
     
-    // Tu backend devuelve el objeto usuario o un ID. 
-    // Asumiremos que devuelve { id: "...", name: "..." } o { identifier: "..." }
-    // Ajusta esto según lo que devuelva exactamente tu `rt.doLogin`.
+    
     const userId = data.id || data.identifier; 
 
-    // 2. Guardamos token
     localStorage.setItem('userId', userId);
 
-    // 3. Notificamos al padre (App.vue) que hemos entrado
     emit('loginSuccess');
     
   } catch (e) {

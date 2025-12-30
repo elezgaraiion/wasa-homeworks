@@ -6,7 +6,6 @@ import(
 
 )
 func (db *appdbimpl) GetMessageByID(userID, convID, messageID string) (models.Message, error) {
-	// 1️⃣ Validar pertenencia del usuario
 	var count int
 	err := db.c.QueryRow(`
 		SELECT COUNT(*) 
@@ -20,7 +19,6 @@ func (db *appdbimpl) GetMessageByID(userID, convID, messageID string) (models.Me
 		return models.Message{}, models.ErrForbidden
 	}
 
-	// 2️⃣ Validar existencia de la conversación
 	var convType string
 	err = db.c.QueryRow(`SELECT type FROM conversations WHERE id = ?`, convID).Scan(&convType)
 	if err == sql.ErrNoRows {
@@ -30,7 +28,6 @@ func (db *appdbimpl) GetMessageByID(userID, convID, messageID string) (models.Me
 		return models.Message{}, err
 	}
 
-	// 3️⃣ Consultar mensaje
 	var m models.Message
 	var senderID string
 	err = db.c.QueryRow(`
@@ -60,10 +57,8 @@ func (db *appdbimpl) GetMessageByID(userID, convID, messageID string) (models.Me
 
 	m.Sender.ID = senderID
 
-	// 4️⃣ Reacciones
 	m.Reactions, _ = db.GetReactions(m.ID)
 
-	// 5️⃣ Aplicar estado leído / entregado si es mío
 	if m.Sender.ID == userID {
 		if convType == "private" {
 			db.applyPrivateStatus(convID, &m)

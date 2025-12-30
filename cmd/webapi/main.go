@@ -77,10 +77,8 @@ func run() error {
 		return fmt.Errorf("registering web UI handler: %w", err)
 	}
 
-	// Apply CORS policy
 	router = applyCORSHandler(router)
 
-	// Create the API server
 	apiserver := http.Server{
 		Addr:              cfg.Web.APIHost,
 		Handler:           router,
@@ -89,40 +87,33 @@ func run() error {
 		WriteTimeout:      cfg.Web.WriteTimeout,
 	}
 
-	// Start the service listening for requests in a separate goroutine
 	go func() {
 		logger.Infof("API listening on %s", apiserver.Addr)
 		serverErrors <- apiserver.ListenAndServe()
 		logger.Infof("stopping API server")
 	}()
 
-	// Waiting for shutdown signal or POSIX signals
 	select {
 	case err := <-serverErrors:
-		// Non-recoverable server error
 		return fmt.Errorf("server error: %w", err)
 
 	case sig := <-shutdown:
 		logger.Infof("signal %v received, start shutdown", sig)
 
-		// Asking API server to shut down and load shed.
 		err := apirouter.Close()
 		if err != nil {
 			logger.WithError(err).Warning("graceful shutdown of apirouter error")
 		}
 
-		// Give outstanding requests a deadline for completion.
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.Web.ShutdownTimeout)
 		defer cancel()
 
-		// Asking listener to shut down and load shed.
 		err = apiserver.Shutdown(ctx)
 		if err != nil {
 			logger.WithError(err).Warning("error during graceful shutdown of HTTP server")
 			err = apiserver.Close()
 		}
 
-		// Log the status of this shutdown.
 		switch {
 		case sig == syscall.SIGSTOP:
 			return errors.New("integrity issue caused shutdown")

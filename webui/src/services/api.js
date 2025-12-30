@@ -1,4 +1,3 @@
-// src/services/api.js
 const API_URL = 'http://localhost:3000'; 
 
 async function request(endpoint, options = {}) {
@@ -6,9 +5,6 @@ async function request(endpoint, options = {}) {
   
   const token = localStorage.getItem('userId');
   
-  // CORRECCIÓN DEFINITIVA: 
-  // Enviamos solo el token limpio. 
-  // Si tu backend recibía "Bearer ...", ahora recibirá "af1d..."
   if (token) {
     headers['Authorization'] = token; 
   }
@@ -43,7 +39,6 @@ export async function getCurrentUser() {
 }
 
 export async function getConversations() {
-  // Añadimos ?_t=... para forzar al navegador a pedir datos frescos siempre
   return request(`/conversations?_t=${Date.now()}`);
 }
 
@@ -61,7 +56,6 @@ export async function updatePhoto(file) {
   const token = localStorage.getItem('userId');
   const headers = {};
   
-  // Aquí también enviamos solo el token limpio
   if (token) headers['Authorization'] = token;
 
   const response = await fetch(`${API_URL}/me/photo`, {
@@ -74,20 +68,14 @@ export async function updatePhoto(file) {
   return response.json();
 }
 export async function searchUsers(query) {
-  // GET /users?q=nombre
-  // encodeURIComponent asegura que espacios y acentos viajen bien en la URL
   const queryString = query ? `?q=${encodeURIComponent(query)}` : '';
   return request(`/users${queryString}`);
 }
-// En src/services/api.js
 
 export async function getConversationMessages(conversationId) {
-  // El truco es añadir ?_t=AHORA_MISMO
-  // Así el navegador cree que es una petición nueva y no usa la memoria caché (304)
   return request(`/conversations/${conversationId}/messages?limit=50&_t=${Date.now()}`);
 }
 export async function createPrivateChat(targetUserId) {
-  // Cambiamos la URL para coincidir con el backend
   return request('/chats', {
     method: 'POST',
     body: JSON.stringify({ targetUserId })
@@ -96,8 +84,6 @@ export async function createPrivateChat(targetUserId) {
 export async function sendMessage(chatId, text, replyToMessageId = null) {
   const payload = { 
       text: text,
-      // IMPORTANTE: Asegúrate de que el nombre del campo coincide
-      // con lo que espera tu struct de Go (json:"replyToMessageId")
       replyToMessageId: replyToMessageId 
   };
   
@@ -110,13 +96,11 @@ export async function getChatInfo(conversationId) {
   return request(`/conversations/${conversationId}`);
 }
 export async function markChatAsRead(conversationId) {
-  // POST /conversations/:id/seen
   return request(`/conversations/${conversationId}/seen`, {
     method: 'POST'
   });
 }
 export async function createGroup(name, userIds) {
-  // POST /groups
   return request('/conversations', {
     method: 'POST',
     body: JSON.stringify({ name: name, users: userIds })
@@ -129,7 +113,6 @@ export async function forwardMessage(sourceChatId, messageId, targetChatId) {
   });
 }
 export async function deleteMessage(chatId, messageId) {
-  // DELETE /conversations/:id/messages/:msgId
   return request(`/conversations/${chatId}/messages/${messageId}`, {
     method: 'DELETE'
   });
@@ -153,14 +136,12 @@ export async function addUserToGroup(conversationId, userId) {
   });
 }
 
-// Salir del grupo
 export async function leaveGroup(conversationId) {
   return request(`/conversations/${conversationId}/users/me`, {
       method: 'DELETE'
   });
 }
 
-// Cambiar nombre del grupo
 export async function setGroupName(conversationId, name) {
   return request(`/conversations/${conversationId}/name`, {
       method: 'PUT',
@@ -168,7 +149,6 @@ export async function setGroupName(conversationId, name) {
   });
 }
 
-// Cambiar foto del grupo (Multipart/Form-data)
 export async function setGroupPhoto(conversationId, file) {
   const formData = new FormData();
   formData.append('photoFile', file);
@@ -177,7 +157,7 @@ export async function setGroupPhoto(conversationId, file) {
   const response = await fetch(`${API_URL}/conversations/${conversationId}/photo`, {
       method: 'PUT',
       headers: {
-          'Authorization': token // NO poner Content-Type, el navegador lo pone solo con el boundary
+          'Authorization': token 
       },
       body: formData
   });

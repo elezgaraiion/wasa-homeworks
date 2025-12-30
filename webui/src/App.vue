@@ -33,25 +33,20 @@ onMounted(async () => {
   
   if (token) {
     try {
-      // CRÍTICO: Pedimos al backend quiénes somos usando el token guardado
       const user = await getCurrentUser();
       
-      // Si el backend responde, guardamos el usuario COMPLETO (nombre, foto, id)
       store.login(user, token);
       
     } catch (e) {
       console.error("Token inválido o error de red:", e);
-      // Si falla, borramos token y mandamos al login
       store.logout(); 
     }
   }
   
-  // Quitamos la pantalla de carga pase lo que pase
   isLoading.value = false;
 });
 
 async function onLoginSuccess() {
-  // Cuando el LoginView nos avisa que entró, volvemos a pedir los datos frescos
   isLoading.value = true;
   const token = localStorage.getItem('userId');
   try {

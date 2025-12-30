@@ -38,7 +38,6 @@ const loading = ref(true);
 
 onMounted(async () => {
   try {
-    // Cargamos tus conversaciones para elegir destino
     const res = await getConversations();
     conversations.value = res || [];
   } catch (e) {
@@ -54,11 +53,10 @@ async function handleForward(targetChat) {
   try {
     const msgId = props.message.id || props.message.ID;
     
-    // Llamada a la API
     await forwardMessage(props.sourceChatId, msgId, targetChat.id);
     
     alert("Mensaje reenviado");
-    emit('forwarded'); // Avisamos para cerrar
+    emit('forwarded'); 
     emit('close');
   } catch (e) {
     alert("Error al reenviar: " + e.message);

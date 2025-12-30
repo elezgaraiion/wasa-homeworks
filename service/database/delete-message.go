@@ -9,7 +9,6 @@ import(
 )
 
 func (db *appdbimpl) DeleteMessage(userID, convID, messageID string) error {
-	// 1️⃣ Validar pertenencia a la conversación
 	var count int
 	err := db.c.QueryRow(`
 		SELECT COUNT(*) 
@@ -23,7 +22,6 @@ func (db *appdbimpl) DeleteMessage(userID, convID, messageID string) error {
 		return models.ErrForbidden
 	}
 
-	// 2️⃣ Comprobar que el mensaje existe y pertenece al usuario
 	var senderID string
 	err = db.c.QueryRow(`
 		SELECT sender_id
@@ -41,7 +39,6 @@ func (db *appdbimpl) DeleteMessage(userID, convID, messageID string) error {
 		return models.ErrForbidden
 	}
 
-	// 3️⃣ Borrar el mensaje
 	_, err = db.c.Exec(`
 		DELETE FROM messages
 		WHERE id = ? AND conversation_id = ?

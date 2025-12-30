@@ -75,14 +75,11 @@ const newName = ref(store.currentUser?.name || store.currentUser?.Name || '');
 const previewPhoto = ref(null);
 const loading = ref(false);
 
-// Computada segura para la foto actual
 const currentAvatar = computed(() => {
   const u = store.currentUser;
-  // Si tiene foto la usamos, si no, la silueta gris
   return u?.photo || u?.Photo || DEFAULT_AVATAR;
 });
 
-// Manejo de error de carga de imagen
 function handleImageError(e) {
   e.target.src = DEFAULT_AVATAR;
 }

@@ -6,15 +6,12 @@ import (
 	"github.com/aritz/wasa-homeworks/service/models"
 )
 
-// Devuelve info de la conversación para mostrar en perfil
 func (db *appdbimpl) GetConversationProfile(userID, convID string) (models.Conversation, error) {
 	var conv models.Conversation
 	
-	// Variables auxiliares para manejar NULLs de la base de datos
 	var name sql.NullString
 	var photo sql.NullString
 
-	// 1. Obtener datos básicos
 	err := db.c.QueryRow(`
 		SELECT c.id, c.type, c.name, c.photo
 		FROM conversations c
@@ -26,14 +23,11 @@ func (db *appdbimpl) GetConversationProfile(userID, convID string) (models.Conve
 		return conv, fmt.Errorf("conversation not found or access denied: %w", err)
 	}
 
-	// Asignar si son válidos
 	if name.Valid { conv.Name = name.String }
 	if photo.Valid { conv.Photo = photo.String }
 
-	// 2. Si es chat PRIVADO, el nombre/foto deben ser los del OTRO usuario
 	if conv.Type == "direct" {
 		var otherName, otherPhoto sql.NullString
-		// Buscamos al participante que NO soy yo
 		err = db.c.QueryRow(`
 			SELECT u.name, u.photo
 			FROM conversation_participants cp
@@ -47,8 +41,6 @@ func (db *appdbimpl) GetConversationProfile(userID, convID string) (models.Conve
 		}
 	}
 
-	// 3. Cargar participantes (Importante para ver quién está en el grupo)
-	// Lo hacemos siempre para que el modal muestre la lista de gente
 	parts, err := db.getParticipantsByConversation(conv.ID)
 	if err == nil {
 		conv.Participants = parts

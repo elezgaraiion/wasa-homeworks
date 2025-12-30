@@ -117,7 +117,6 @@ func (rt *_router) listReactionsForMessage(w http.ResponseWriter, r *http.Reques
         return
     }
 
-    // Validar que el usuario pertenece a la conversación
     ok, err := rt.db.IsUserInConversation(userID, convID)
 	if err != nil {
     	http.Error(w, "Internal server error", 500)
@@ -164,7 +163,6 @@ func (rt *_router) addReactionToMessage(w http.ResponseWriter, r *http.Request, 
         return
     }
 
-    // Validar que el usuario pertenece a la conversación
     ok, err := rt.db.IsUserInConversation(userID, convID)
     if err != nil {
         http.Error(w, "Internal server error", 500)
@@ -175,7 +173,6 @@ func (rt *_router) addReactionToMessage(w http.ResponseWriter, r *http.Request, 
         return
     }
 
-    // Añadir la reacción
     reaction, err := rt.db.AddReaction(userID, convID, msgID, payload.Emoji)
     if err != nil {
         switch {
@@ -208,7 +205,6 @@ func (rt *_router) removeReactionFromMessage(w http.ResponseWriter, r *http.Requ
         return
     }
 
-    // Validar que el usuario pertenece a la conversación
     ok, err := rt.db.IsUserInConversation(userID, convID)
     if err != nil {
         http.Error(w, "Internal server error", 500)
@@ -219,7 +215,6 @@ func (rt *_router) removeReactionFromMessage(w http.ResponseWriter, r *http.Requ
         return
     }
 
-    // Eliminar la reacción
     err = rt.db.RemoveReaction(userID, convID, msgID, reactionID)
     if err != nil {
         switch {

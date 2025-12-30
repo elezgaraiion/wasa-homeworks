@@ -8,7 +8,6 @@ import (
 )
 
 func (db *appdbimpl) SetGroupName(userID, convID, newName string) (models.Conversation, error) {
-	// 1. Verificar que la conversación existe y es grupo
 	var convType string
 	err := db.c.QueryRow(`
 		SELECT type FROM conversations WHERE id = ?
@@ -23,7 +22,6 @@ func (db *appdbimpl) SetGroupName(userID, convID, newName string) (models.Conver
 		return models.Conversation{}, fmt.Errorf("cannot rename private conversation")
 	}
 
-	// 2. Verificar que el usuario pertenece al grupo
 	var exists int
 	err = db.c.QueryRow(`
 		SELECT COUNT(*) FROM conversation_participants
@@ -36,7 +34,6 @@ func (db *appdbimpl) SetGroupName(userID, convID, newName string) (models.Conver
 		return models.Conversation{}, models.ErrForbidden
 	}
 
-	// 3. Actualizar nombre del grupo
 	_, err = db.c.Exec(`
 		UPDATE conversations
 		SET name = ?
@@ -46,6 +43,5 @@ func (db *appdbimpl) SetGroupName(userID, convID, newName string) (models.Conver
 		return models.Conversation{}, err
 	}
 
-	// 4. Devolver información actualizada
 	return db.GetConversationProfile(userID, convID)
 }

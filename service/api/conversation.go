@@ -71,11 +71,9 @@ func (rt *_router) listConversationMessages(w http.ResponseWriter, r *http.Reque
         return
     }
 
-    // Query params
     limit := 50
     before := r.URL.Query().Get("before")
 
-    // OPTIONAL limit override
     if q := r.URL.Query().Get("limit"); q != "" {
         if v, err := strconv.Atoi(q); err == nil && v > 0 && v <= 100 {
             limit = v
@@ -102,13 +100,11 @@ func (rt *_router) listConversationMessages(w http.ResponseWriter, r *http.Reque
 func (rt *_router) createPrivateConversation(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
     userID := r.Header.Get("Authorization")
     
-    // Leer el JSON { "targetUserId": "..." }
     var body struct {
         TargetUserID string `json:"targetUserId"`
     }
     json.NewDecoder(r.Body).Decode(&body)
 
-    // LLAMADA MÁGICA: Si existe lo devuelve, si no lo crea
     conv, err := rt.db.GetOrCreateOneOnOneConversation(userID, body.TargetUserID)
     if err != nil {
         http.Error(w, "Error", 500)
@@ -141,7 +137,6 @@ func (rt *_router) sendMessage(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
-	// Validación: al menos text o photo
 	if payload.Text == "" && payload.PhotoURL == "" {
 		http.Error(w, "text or photoUrl required", http.StatusBadRequest)
 		return
@@ -199,5 +194,5 @@ func (rt *_router) deleteMessage(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent) // 204
+	w.WriteHeader(http.StatusNoContent) 
 }

@@ -6,7 +6,6 @@ import (
 )
 
 func (db *appdbimpl) LeaveGroup(userID, convID string) error {
-    // 1. Comprobar que la conversación existe y es grupo
     var convType string
     err := db.c.QueryRow(`
         SELECT type FROM conversations WHERE id = ?
@@ -21,7 +20,6 @@ func (db *appdbimpl) LeaveGroup(userID, convID string) error {
         return models.ErrForbidden
     }
 
-    // 2. Comprobar que el usuario es miembro
     var exists int
     err = db.c.QueryRow(`
         SELECT COUNT(*) FROM conversation_participants
@@ -34,7 +32,6 @@ func (db *appdbimpl) LeaveGroup(userID, convID string) error {
         return models.ErrForbidden
     }
 
-    // 3. Borrar usuario de participantes y meta
     _, err = db.c.Exec(`
         DELETE FROM conversation_participants
         WHERE conversation_id = ? AND user_id = ?

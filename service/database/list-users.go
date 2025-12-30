@@ -5,7 +5,6 @@ import (
 	"github.com/aritz/wasa-homeworks/service/models"
 )
 
-// ListUsers returns all users or filters by a partial name (case-insensitive)
 func (db *appdbimpl) ListUsers(query, currentUserID string) ([]models.User, error) {
     rows, err := db.c.Query(`
         SELECT id, name, photo 

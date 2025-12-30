@@ -136,7 +136,7 @@ import ChatInfoModal from './ChatInfoModal.vue';
 import ForwardModal from './ForwardModal.vue'; 
 
 const props = defineProps(['chat']); 
-const emit = defineEmits(['refresh']); // EMITE AL PADRE (App.vue)
+const emit = defineEmits(['refresh']); 
 
 const messages = ref([]);
 const loading = ref(false);
@@ -153,19 +153,14 @@ const replyingToMessage = ref(null);
 const msgToReact = ref(null);
 const availableEmojis = ['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🎉'];
 
-// --- MANEJADOR DE ACTUALIZACIONES ---
 function handleChatUpdated(updateInfo) {
-    // 1. Si nos llega el nuevo nombre o foto, lo actualizamos LOCALMENTE YA
-    // para que la cabecera cambie sin esperar al refresh del padre.
     if (updateInfo) {
         if (updateInfo.type === 'name') props.chat.name = updateInfo.value;
         if (updateInfo.type === 'photo') props.chat.photo = updateInfo.value;
     }
 
-    // 2. Avisamos al padre (App.vue) para que recargue la lista lateral
     emit('refresh');
     
-    // 3. Recargamos mensajes (por si acaso)
     loadMessages(true);
 }
 

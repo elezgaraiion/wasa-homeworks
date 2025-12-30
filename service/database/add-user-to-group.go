@@ -10,7 +10,6 @@ import (
 
 func (db *appdbimpl) AddUserToGroup(requestUserID, convID, targetUserID string) (models.Conversation, error) {
 
-	// 1. Validar miembro del grupo
 	var exists int
 	err := db.c.QueryRow(`
 		SELECT COUNT(*)
@@ -25,7 +24,6 @@ func (db *appdbimpl) AddUserToGroup(requestUserID, convID, targetUserID string) 
 		return models.Conversation{}, models.ErrForbidden
 	}
 
-	// 2. Comprobar que convo existe y es grupo
 	var convType string
 	err = db.c.QueryRow(`
 		SELECT type FROM conversations WHERE id = ?
@@ -41,7 +39,6 @@ func (db *appdbimpl) AddUserToGroup(requestUserID, convID, targetUserID string) 
 		return models.Conversation{}, fmt.Errorf("cannot add users to private conversations")
 	}
 
-	// 3. Evitar añadir duplicado
 	err = db.c.QueryRow(`
 		SELECT COUNT(*)
 		FROM conversation_participants
@@ -52,11 +49,9 @@ func (db *appdbimpl) AddUserToGroup(requestUserID, convID, targetUserID string) 
 		return models.Conversation{}, err
 	}
 	if exists > 0 {
-		// Ya está → no es error, devolvemos la conversation igual
 		return db.GetConversationProfile(requestUserID, convID)
 	}
 
-	// 4. Insert participant
 	_, err = db.c.Exec(`
 		INSERT INTO conversation_participants(conversation_id, user_id)
 		VALUES (?, ?)
@@ -65,7 +60,6 @@ func (db *appdbimpl) AddUserToGroup(requestUserID, convID, targetUserID string) 
 		return models.Conversation{}, err
 	}
 
-	// 5. Insert meta
 	joinedAt := time.Now().UTC().Format(time.RFC3339)
 
 	_, err = db.c.Exec(`
@@ -76,6 +70,5 @@ func (db *appdbimpl) AddUserToGroup(requestUserID, convID, targetUserID string) 
 		return models.Conversation{}, err
 	}
 
-	// 6. Devolver conversación actualizada (reutilizado)
 	return db.GetConversationProfile(requestUserID, convID)
 }

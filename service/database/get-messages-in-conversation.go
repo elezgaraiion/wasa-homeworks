@@ -14,7 +14,6 @@ func (db *appdbimpl) GetMessagesInConversation(
 	before string,
 ) ([]models.Message, error) {
 
-	// 1. Validar acceso
 	var count int
 	err := db.c.QueryRow(`
 		SELECT COUNT(*)
@@ -25,7 +24,6 @@ func (db *appdbimpl) GetMessagesInConversation(
 	if err != nil { return nil, err }
 	if count == 0 { return nil, models.ErrForbidden }
 
-	// 2. Query de Mensajes
 	query := `
 		SELECT 
 			m.id, m.sender_id, u.name, u.photo, m.conversation_id,
@@ -76,7 +74,6 @@ func (db *appdbimpl) GetMessagesInConversation(
 		if err != nil { t, _ = time.Parse(time.RFC3339, createdAtStr) }
 		m.CreatedAt = t
 
-		// ReplyTo Logic
 		if replyToID.Valid && replyToID.String != "" {
 			m.ReplyToMessageID = replyToID.String
 			m.ReplyTo = &models.Message{
@@ -87,18 +84,14 @@ func (db *appdbimpl) GetMessagesInConversation(
 			}
 		}
 
-		// =================================================================
-		// ¡¡AQUÍ ES DONDE ESTABA EL PROBLEMA!!
-		// Tienes que cargar las reacciones para CADA mensaje
-		// =================================================================
+		
 		reactions, _ := db.GetReactions(m.ID)
 		
 		if reactions == nil {
-			m.Reactions = []models.Reaction{} // Array vacío para evitar null
+			m.Reactions = []models.Reaction{} 
 		} else {
 			m.Reactions = reactions
 		}
-		// =================================================================
 
 		msgs = append(msgs, m)
 	}
@@ -132,8 +125,6 @@ func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
 		var r models.Reaction
 		var createdAtStr string
 		
-		// IMPORTANTE: Usamos sql.NullString para la foto, 
-		// porque si la base de datos devuelve NULL, el Scan fallaría con un string normal.
 		var userPhoto sql.NullString
 
 		err = rows.Scan(
@@ -145,16 +136,13 @@ func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
 			&createdAtStr,
 		)
 		if err != nil {
-			// Si falla el escaneo, devolvemos el error para saber qué pasa
 			return nil, err
 		}
 
-		// Asignamos la foto si es válida
 		if userPhoto.Valid {
 			r.User.Photo = userPhoto.String
 		}
 
-		// Parsear fecha
 		t, err := time.Parse(time.RFC3339, createdAtStr)
 		if err == nil {
 			r.CreatedAt = t
@@ -163,7 +151,6 @@ func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
 		reactions = append(reactions, r)
 	}
 
-	// Devolver array vacío en lugar de nil si no hay datos
 	if reactions == nil {
 		reactions = []models.Reaction{}
 	}
@@ -180,7 +167,6 @@ func (db *appdbimpl) applySeenStatus(
     for i := range msgs {
         msg := &msgs[i]
 
-        // mensajes que no son míos -> no calculo
         if msg.Sender.ID != requestingUser {
             continue
         }

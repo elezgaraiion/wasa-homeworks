@@ -28,7 +28,6 @@ func (rt *_router) addUserToGroup(w http.ResponseWriter, r *http.Request, ps htt
         return
     }
 
-    // parse body
     var body addUserToGroupReq
     if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
         http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -40,7 +39,6 @@ func (rt *_router) addUserToGroup(w http.ResponseWriter, r *http.Request, ps htt
         return
     }
 
-    // ✅ Llamada a la DB con IDs de usuario, no structs
     conv, err := rt.db.AddUserToGroup(authUserID, conversationID, body.UserID)
     if err != nil {
         switch err {
@@ -86,7 +84,7 @@ func (rt *_router) leaveGroup(w http.ResponseWriter, r *http.Request, ps httprou
         return
     }
 
-    w.WriteHeader(http.StatusNoContent) // 204
+    w.WriteHeader(http.StatusNoContent) 
 }
 type setGroupNameReq struct {
 	Name string `json:"name"`
@@ -146,7 +144,6 @@ func (rt *_router) setGroupPhoto(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	// Parse multipart form (limitar tamaño 10 MB)
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
@@ -159,20 +156,17 @@ func (rt *_router) setGroupPhoto(w http.ResponseWriter, r *http.Request, ps http
 	}
 	defer file.Close()
 
-	// Validar extensión simple (opcional)
 	if handler.Filename == "" {
 		http.Error(w, "Invalid file", http.StatusBadRequest)
 		return
 	}
 
-	// Guardar archivo temporalmente y generar URL
 	photoURL, err := rt.saveGroupPhoto(conversationID, file, handler.Filename)
 	if err != nil {
 		http.Error(w, "Failed to save photo", http.StatusInternalServerError)
 		return
 	}
 
-	// Actualizar en DB
 	conv, err := rt.db.SetGroupPhoto(authUserID, conversationID, photoURL)
 	if err != nil {
 		switch err {
@@ -191,7 +185,6 @@ func (rt *_router) setGroupPhoto(w http.ResponseWriter, r *http.Request, ps http
 	json.NewEncoder(w).Encode(conv)
 }
 func (rt *_router) saveGroupPhoto(conversationID string, file multipart.File, filename string) (string, error) {
-	// Ejemplo simple: guardamos en ./uploads/<conversationId>_<filename>
 	outPath := fmt.Sprintf("./uploads/%s_%s", conversationID, filename)
 	outFile, err := os.Create(outPath)
 	if err != nil {
@@ -204,7 +197,6 @@ func (rt *_router) saveGroupPhoto(conversationID string, file multipart.File, fi
 		return "", err
 	}
 
-	// Retornar URL accesible (puedes ajustar a tu servidor estático)
 	photoURL := fmt.Sprintf("/uploads/%s_%s", conversationID, filename)
 	return photoURL, nil
 }

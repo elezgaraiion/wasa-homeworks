@@ -6,8 +6,9 @@
       <div class="group-header">
         <div class="photo-container">
             <img 
-                :src="localChat.photo || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" 
+                :src="resolveUrl(localChat.photo) || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" 
                 class="group-avatar" 
+                @error="handleImgError"
             />
             <label v-if="isGroup" class="edit-photo-btn">
                 📷
@@ -57,7 +58,7 @@
 
         <div class="user-list" v-if="searchResults.length > 0">
             <div v-for="user in searchResults" :key="user.id" class="user-row">
-                <img :src="user.photo || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" class="user-avatar-small" />
+                <img :src="resolveUrl(user.photo) || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" class="user-avatar-small" />
                 <span class="user-name">{{ user.name }}</span>
                 
                 <button v-if="isAlreadyMember(user.id)" class="btn-member" disabled>Already a member</button>
@@ -77,102 +78,128 @@
   </div>
 </template>
 
-<script setup>
-import { ref, watch, nextTick } from 'vue';
-import { setGroupName, setGroupPhoto, addUserToGroup, leaveGroup, searchUsers } from '../services/api';
-
-const props = defineProps(['chatId', 'chat']);
-const emit = defineEmits(['close', 'chatUpdated']);
-
-const localChat = ref({});
-const participantsList = ref([]);
-const isGroup = ref(false);
-
-const isEditingName = ref(false);
-const newName = ref('');
-const nameInput = ref(null);
-
-const searchQuery = ref('');
-const searchResults = ref([]);
-
-watch(() => props.chat, (newChat) => {
-    if (newChat) {
-        localChat.value = { ...newChat };
-        isGroup.value = newChat.type === 'group';
-        participantsList.value = newChat.participants || [];
+<script>
+export default {
+  name: "ChatInfoModal",
+  props: ['chatId', 'chat'],
+  emits: ['close', 'chatUpdated'],
+  data() {
+    return {
+      localChat: {},
+      participantsList: [],
+      isGroup: false,
+      isEditingName: false,
+      newName: '',
+      searchQuery: '',
+      searchResults: []
+    };
+  },
+  watch: {
+    chat: {
+      immediate: true,
+      handler(newChat) {
+        if (newChat) {
+          this.localChat = { ...newChat };
+          this.isGroup = newChat.type === 'group';
+          this.participantsList = newChat.participants || [];
+        }
+      }
     }
-}, { immediate: true });
+  },
+  methods: {
+    resolveUrl(path) {
+        if (!path) return '';
+        if (path.startsWith('http')) return path;
+        return this.$axios.defaults.baseURL + path;
+    },
+    handleImgError(e) {
+      e.target.src = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
+    },
 
-function isAlreadyMember(userId) {
-    return participantsList.value.some(p => {
+    isAlreadyMember(userId) {
+      return this.participantsList.some(p => {
         const pId = p.id || p.user_id || p; 
         return pId === userId;
-    });
-}
+      });
+    },
 
-async function handleSearch() {
-    if (searchQuery.value.length < 2) {
-        searchResults.value = [];
+    async handleSearch() {
+      if (this.searchQuery.length < 2) {
+        this.searchResults = [];
         return;
-    }
-    try {
-        const res = await searchUsers(searchQuery.value);
-        searchResults.value = res || [];
-    } catch (e) { console.error(e); }
-}
+      }
+      try {
+        const res = await this.$axios.get('/users', { params: { q: this.searchQuery } });
+        this.searchResults = res.data || [];
+      } catch (e) { console.error(e); }
+    },
 
-async function addToGroup(user) {
-    try {
-        await addUserToGroup(props.chatId, user.id);
-        participantsList.value.push(user);
-        searchQuery.value = '';
-        searchResults.value = [];
-        emit('chatUpdated'); 
+    async addToGroup(user) {
+      try {
+        await this.$axios.post(`/conversations/${this.chatId}/users`, { 
+            userId: user.id 
+        });
+        
+        this.participantsList.push(user);
+        this.searchQuery = '';
+        this.searchResults = [];
+        this.$emit('chatUpdated');
         alert(`${user.name} added.`);
-    } catch (e) { alert("Error adding user."); }
-}
+      } catch (e) { 
+        console.error(e);
+        alert("Error adding user: " + (e.response?.data?.error || e.message)); 
+      }
+    },
 
-function startEditingName() {
-    newName.value = localChat.value.name || '';
-    isEditingName.value = true;
-    nextTick(() => nameInput.value?.focus());
-}
+    startEditingName() {
+      this.newName = this.localChat.name || '';
+      this.isEditingName = true;
+      this.$nextTick(() => {
+        if(this.$refs.nameInput) this.$refs.nameInput.focus();
+      });
+    },
 
-async function saveName() {
-    if (!newName.value.trim()) return;
-    try {
-        const updated = await setGroupName(props.chatId, newName.value);
-        localChat.value.name = updated.name;
-        isEditingName.value = false;
+    async saveName() {
+      if (!this.newName.trim()) return;
+      try {
+        const response = await this.$axios.put(`/conversations/${this.chatId}/name`, { name: this.newName });
+        const updated = response.data;
+        this.localChat.name = updated.name;
+        this.isEditingName = false;
         
-        emit('chatUpdated', { type: 'name', value: updated.name });
+        this.$emit('chatUpdated', { type: 'name', value: updated.name });
         
-    } catch (e) {
+      } catch (e) {
         alert("Error changing name.");
-    }
-}
+      }
+    },
 
-async function handlePhotoChange(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    try {
-        const updated = await setGroupPhoto(props.chatId, file);
+    async handlePhotoChange(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const formData = new FormData();
+        formData.append('photoFile', file);
+        const response = await this.$axios.put(`/conversations/${this.chatId}/photo`, formData);
+        const updated = response.data;
         const newPhotoUrl = updated.photo + '?t=' + new Date().getTime();
-        localChat.value.photo = newPhotoUrl;
+        this.localChat.photo = newPhotoUrl;
         
-        emit('chatUpdated', { type: 'photo', value: newPhotoUrl });
-    } catch (e) { alert("Error uploading photo."); }
-}
+        this.$emit('chatUpdated', { type: 'photo', value: newPhotoUrl });
+      } catch (e) { alert("Error uploading photo."); }
+    },
 
-async function handleLeaveGroup() {
-    if(!confirm("Are you sure you want to leave?")) return;
-    try {
-        await leaveGroup(props.chatId);
-        emit('chatUpdated');
-        emit('close');
+    async handleLeaveGroup() {
+      if(!confirm("Are you sure you want to leave?")) return;
+      try {
+        await this.$axios.delete(`/conversations/${this.chatId}/users/me`);
+        this.$emit('chatUpdated');
+        this.$emit('close');
         window.location.reload(); 
-    } catch (e) { alert("Error leaving."); }
-}
+      } catch (e) { alert("Error leaving."); }
+    }
+  }
+};
 </script>
 
 <style scoped>

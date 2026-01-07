@@ -3,14 +3,15 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"log"
+
+	"github.com/aritz/wasa-homeworks/service/api/reqcontext"
 	"github.com/aritz/wasa-homeworks/service/models"
 
 	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 )
 
-func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
 	var req struct {
 		Name string `json:"name"`
 	}
@@ -34,14 +35,17 @@ func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.
 
 	err = rt.db.CreateUser(newUser)
 	if err != nil {
+		ctx.Logger.WithError(err).Error("cannot create user")
 		http.Error(w, "cannot create user", http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{"identifier": newUser.ID})
 }
-func (rt *_router) getMyConversations(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	userID := r.Header.Get("Authorization")
+
+func (rt *_router) getMyConversations(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
+	userHeader := r.Header.Get("Authorization")
+	userID := extractBearer(userHeader)
 	if userID == "" {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -49,7 +53,7 @@ func (rt *_router) getMyConversations(w http.ResponseWriter, r *http.Request, _ 
 
 	convs, err := rt.db.GetMyConversations(userID)
 	if err != nil {
-		log.Printf("ERROR GetMyConversations (%s): %v\n", userID, err)
+		ctx.Logger.WithError(err).Error("GetMyConversations failed")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}

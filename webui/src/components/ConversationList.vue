@@ -3,7 +3,7 @@
     
     <header class="sidebar-header">
       <div class="user-profile-section" @click="$emit('openProfile')" title="Edit my profile">
-        <img :src="avatarUrl" @error="handleImageError" class="user-avatar" alt="Avatar" />
+        <img :src="getMyAvatarUrl()" @error="handleImageError" class="user-avatar" alt="Avatar" />
         <div class="my-info">
           <span class="my-name">{{ userName }}</span>
         </div>
@@ -26,7 +26,7 @@
       <div v-if="loading && conversations.length === 0" class="state-msg">Loading...</div>
       <div v-else-if="conversations.length === 0" class="state-msg"><p>You have no conversations.</p></div>
       <div v-else v-for="chat in conversations" :key="chat.id" class="chat-item" :class="{ active: selectedChatId === chat.id }" @click="selectChat(chat)">
-        <img :src="chat.photo || DEFAULT_AVATAR" @error="handleImageError" class="chat-avatar" />
+        <img :src="getChatAvatarUrl(chat)" @error="handleImageError" class="chat-avatar" />
         <div class="chat-info">
           <div class="chat-row-top">
             <span class="chat-name">{{ chat.name || chat.Name || 'Chat' }}</span>
@@ -47,110 +47,130 @@
       </div>
     </div>
 
-    <Teleport to="body">
-      <UserSearchModal 
-        v-if="showSearchModal" 
-        @close="showSearchModal = false"
-        @chatStarted="onChatCreated" 
-      />
+    <UserSearchModal 
+      v-if="showSearchModal" 
+      @close="showSearchModal = false"
+      @chatStarted="onChatCreated" 
+    />
 
-      <CreateGroupModal
-        v-if="showGroupModal"
-        @close="showGroupModal = false"
-        @groupCreated="onChatCreated" 
-      />
-    </Teleport>
+    <CreateGroupModal
+      v-if="showGroupModal"
+      @close="showGroupModal = false"
+      @groupCreated="onChatCreated" 
+    />
 
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { getConversations } from '../services/api'; 
-import { store } from '../store.js'; 
-import UserSearchModal from './UserSearchModal.vue'; 
+<script>
+import UserSearchModal from './UserSearchModal.vue';
 import CreateGroupModal from './CreateGroupModal.vue';
 
-const DEFAULT_AVATAR = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
-const emit = defineEmits(['chatSelected', 'openProfile']);
+export default {
+  name: "ConversationList",
+  components: {
+    UserSearchModal,
+    CreateGroupModal
+  },
+  props: ['currentUser'],
+  data() {
+    return {
+      conversations: [],
+      loading: true,
+      selectedChatId: null,
+      showSearchModal: false,
+      showGroupModal: false,
+      refreshInterval: null,
+      DEFAULT_AVATAR: 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'
+    };
+  },
+  computed: {
+    userName() {
+      return this.currentUser?.name || this.currentUser?.Name || 'User';
+    }
+  },
+  methods: {
+    handleImageError(e) {
+      e.target.src = this.DEFAULT_AVATAR;
+    },
+    resolveUrl(path) {
+        if (!path) return '';
+        if (path.startsWith('http')) return path;
+        return this.$axios.defaults.baseURL + path;
+    },
+    getMyAvatarUrl() {
+        const path = this.currentUser?.photo || this.currentUser?.Photo;
+        if (!path) return this.DEFAULT_AVATAR;
+        const fullUrl = this.resolveUrl(path);
+        return fullUrl; 
+    },
+    getChatAvatarUrl(chat) {
+        const path = chat.photo || chat.Photo;
+        if (!path) return this.DEFAULT_AVATAR;
+        return this.resolveUrl(path);
+    },
+    isMe(chat) {
+      const myId = this.currentUser?.id || localStorage.getItem('userId');
+      return chat.lastMessageSenderId === myId;
+    },
+    formatTime(dateStr) {
+      if (!dateStr || dateStr === '' || dateStr.startsWith('0001')) return '';
+      const safeDateStr = dateStr.replace(' ', 'T');
+      let date = new Date(safeDateStr);
+      if (isNaN(date.getTime())) date = new Date(safeDateStr + 'Z');
+      if (isNaN(date.getTime())) return '';
+      const now = new Date();
+      const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      return isToday 
+        ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
+    },
+    handleLogout() {
+      if (confirm('Log out?')) {
+          localStorage.removeItem('userId');
+          this.$router.push('/login');
+      }
+    },
+    async loadConversations() {
+      try {
+        const res = await this.$axios.get('/conversations');
+        this.conversations = res.data || [];
+      } catch (error) {
+        console.error("Error chats:", error);
+      } finally {
+        this.loading = false;
+      }
+    },
+    async onChatCreated(chat) {
+      this.showSearchModal = false;
+      this.showGroupModal = false;
 
-const conversations = ref([]);
-const loading = ref(true);
-const selectedChatId = ref(null);
-const showSearchModal = ref(false);
-const showGroupModal = ref(false); 
-let refreshInterval = null;
-
-const userName = computed(() => store.currentUser?.name || store.currentUser?.Name || 'User');
-const avatarUrl = computed(() => store.currentUser?.photo || store.currentUser?.Photo || DEFAULT_AVATAR);
-
-function handleImageError(e) { e.target.src = DEFAULT_AVATAR; }
-
-function isMe(chat) {
-  const myId = store.currentUser?.id || localStorage.getItem('userId');
-  return chat.lastMessageSenderId === myId;
-}
-
-function formatTime(dateStr) {
-  if (!dateStr || dateStr === '' || dateStr.startsWith('0001')) return '';
-  const safeDateStr = dateStr.replace(' ', 'T');
-  let date = new Date(safeDateStr);
-  if (isNaN(date.getTime())) date = new Date(safeDateStr + 'Z');
-  if (isNaN(date.getTime())) return '';
-  const now = new Date();
-  const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-  return isToday 
-    ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
-}
-
-function handleLogout() {
-  if (confirm('Log out?')) store.logout();
-}
-
-async function loadConversations() {
-  try {
-    const res = await getConversations();
-    conversations.value = res || [];
-  } catch (error) {
-    console.error("Error chats:", error);
-  } finally {
-    loading.value = false;
+      const index = this.conversations.findIndex(c => c.id === chat.id);
+      if (index !== -1) {
+        this.conversations.splice(index, 1);
+        this.conversations.unshift(chat);
+      } else {
+        this.conversations.unshift(chat);
+      }
+      this.selectChat(chat);
+    },
+    selectChat(chat) {
+      this.selectedChatId = chat.id;
+      this.$emit('chatSelected', chat);
+    }
+  },
+  mounted() {
+    this.loadConversations();
+    this.refreshInterval = setInterval(this.loadConversations, 4000);
+  },
+  beforeUnmount() {
+    if (this.refreshInterval) clearInterval(this.refreshInterval);
   }
-}
-
-async function onChatCreated(chat) {
-  showSearchModal.value = false;
-  showGroupModal.value = false; 
-
-  const existing = conversations.value.find(c => c.id === chat.id);
-  if (!existing) {
-    conversations.value.unshift(chat);
-  }
-  selectChat(chat);
-  await loadConversations();
-}
-
-function selectChat(chat) {
-  selectedChatId.value = chat.id;
-  emit('chatSelected', chat);
-}
-
-onMounted(() => {
-  loadConversations();
-  refreshInterval = setInterval(loadConversations, 4000);
-});
-
-onUnmounted(() => {
-  if (refreshInterval) clearInterval(refreshInterval);
-});
-
-defineExpose({ refreshList: loadConversations });
+};
 </script>
 
 <style scoped>
 .header-actions { display: flex; gap: 20px; align-items: center; } 
-
 .sidebar { display: flex; flex-direction: column; height: 100%; background-color: #111b21; border-right: 1px solid #2f3b43; color: #e9edef; position: relative; }
 .sidebar-header { height: 60px; background-color: #202c33; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .user-profile-section { display: flex; align-items: center; cursor: pointer; padding: 5px; border-radius: 8px; max-width: 80%; transition: 0.2s; }

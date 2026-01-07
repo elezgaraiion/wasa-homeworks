@@ -4,7 +4,7 @@
     <aside class="left-pane">
       <ConversationList 
         v-if="!showProfileEdit"
-        :currentUser="store.currentUser" 
+        :currentUser="currentUser" 
         @chatSelected="handleChatSelected"
         @openProfile="showProfileEdit = true"
       />
@@ -43,34 +43,40 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue';
-import { store } from '../store.js';
+<script>
 import ConversationList from '../components/ConversationList.vue';
 import ProfileEdit from '../components/ProfileEdit.vue';
 import ChatWindow from '../components/ChatWindow.vue';
-import { getCurrentUser } from '../services/api';
 
-const currentChat = ref(null);
-const showProfileEdit = ref(false);
-
-function handleChatSelected(chat) {
-  chat.unreadCount = 0;
-  
-  currentChat.value = chat;
-  showProfileEdit.value = false;
-}
-
-onMounted(async () => {
-  if (!store.currentUser) {
+export default {
+  name: "DashboardView",
+  components: {
+    ConversationList,
+    ProfileEdit,
+    ChatWindow
+  },
+  data() {
+    return {
+      currentUser: null,
+      currentChat: null,
+      showProfileEdit: false
+    };
+  },
+  methods: {
+    handleChatSelected(chat) {
+      chat.unreadCount = 0;
+      this.currentChat = chat;
+      this.showProfileEdit = false;
+    }
+  },
+  async mounted() {
     try {
-      const user = await getCurrentUser();
-      store.login(user, localStorage.getItem('userId'));
+      const response = await this.$axios.get('/me');
+      this.currentUser = response.data;
     } catch (e) {
-      console.error(e);
     }
   }
-});
+};
 </script>
 
 <style scoped>

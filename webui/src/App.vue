@@ -4,58 +4,36 @@
       <div class="spinner"></div>
       <p>Connecting to WASA...</p>
     </div>
-
-    <div v-else>
-      <LoginView 
-        v-if="!store.isAuthenticated" 
-        @loginSuccess="onLoginSuccess" 
-      />
-      
-      <Dashboard 
-        v-else 
-      />
-    </div>
+    <router-view v-else />
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue';
-import { store } from './store.js';
-import { getCurrentUser } from './services/api';
-
-import LoginView from './views/LoginView.vue';
-import Dashboard from './views/Dashboard.vue';
-
-const isLoading = ref(true);
-
-onMounted(async () => {
-  const token = localStorage.getItem('userId');
-  
-  if (token) {
-    try {
-      const user = await getCurrentUser();
-      
-      store.login(user, token);
-      
-    } catch (e) {
-      console.error("Invalid token or network error:", e);
-      store.logout(); 
+<script>
+export default {
+  name: 'App',
+  data() {
+    return {
+      isLoading: true
     }
-  }
-  
-  isLoading.value = false;
-});
-
-async function onLoginSuccess() {
-  isLoading.value = true;
-  const token = localStorage.getItem('userId');
-  try {
-    const user = await getCurrentUser();
-    store.login(user, token);
-  } catch(e) {
-    console.error(e);
-  } finally {
-    isLoading.value = false;
+  },
+  async mounted() {
+    const token = localStorage.getItem('userId');
+    
+    if (token) {
+      try {
+        await this.$axios.get('/me');
+      } catch (e) {
+        localStorage.removeItem('userId');
+        if (this.$route.path !== '/login') {
+             this.$router.push('/login');
+        }
+      }
+    } else {
+      if (this.$route.path !== '/login') {
+           this.$router.push('/login');
+      }
+    }
+    this.isLoading = false;
   }
 }
 </script>

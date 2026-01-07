@@ -20,22 +20,20 @@ func (db *appdbimpl) MarkConversationSeen(userID, convID string) error {
 		return errors.New("forbidden")
 	}
 
-	nowStr := time.Now().UTC().Add(5 * time.Second).Format(time.RFC3339)
+	nowStr := time.Now().UTC().Format(time.RFC3339)
 
-	res, err := db.c.Exec(`
-		UPDATE conversation_user_meta 
-		SET last_seen_message_at = ?
-		WHERE conversation_id = ? AND user_id = ?
-	`, nowStr, convID, userID)
+	_, err = db.c.Exec(`
+		INSERT OR REPLACE INTO conversation_user_meta (conversation_id, user_id, last_seen_message_at, joined_at)
+		VALUES (
+			?, 
+			?, 
+			?,
+			COALESCE((SELECT joined_at FROM conversation_user_meta WHERE conversation_id=? AND user_id=?), ?)
+		)
+	`, convID, userID, nowStr, convID, userID, nowStr)
+	
 	if err != nil { return err }
 
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
-		db.c.Exec(`INSERT INTO conversation_user_meta (conversation_id, user_id, last_seen_message_at, joined_at) VALUES (?, ?, ?, ?)`, convID, userID, nowStr, nowStr)
-	}
-
-	
-	
 	query := `
 		UPDATE messages
 		SET status = 'read'

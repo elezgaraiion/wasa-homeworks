@@ -38,48 +38,65 @@
   </div>
 </template>
 
-<script setup>
-import { ref, nextTick } from 'vue';
-import { doLogin } from '../services/api';
+<script>
+export default {
+  name: "LoginView",
+  data() {
+    return {
+      showInput: false,
+      username: "",
+      loading: false,
+      error: ""
+    };
+  },
+  methods: {
+    startInteraction() {
+      this.showInput = true;
+      
+      this.$nextTick(() => {
+        setTimeout(() => {
+          if (this.$refs.inputField) {
+            this.$refs.inputField.focus();
+          }
+        }, 500);
+      });
+    },
 
-const emit = defineEmits(['loginSuccess']);
+    async handleLogin() {
+      this.error = "";
+      if (this.username.trim().length < 3) {
+        this.error = "Name is too short (min 3 letters).";
+        return;
+      }
 
-const showInput = ref(false); 
-const username = ref('');
-const loading = ref(false);
-const error = ref('');
-const inputField = ref(null); 
+      this.loading = true;
 
-function startInteraction() {
-  showInput.value = true;
-  nextTick(() => {
-    setTimeout(() => inputField.value?.focus(), 500);
-  });
-}
+      try {
+        const response = await this.$axios.post("/session", { 
+            name: this.username.trim() 
+        });
+        
+        const data = response.data;
+        const userId = data.id || data.identifier;
 
-async function handleLogin() {
-  error.value = '';
-  if (username.value.trim().length < 3) {
-    error.value = 'Name is too short (min 3 letters).';
-    return;
+        localStorage.setItem("userId", userId);
+
+        this.$emit("loginSuccess");
+
+        this.$router.push("/");
+
+      } catch (e) {
+        if (e.response && e.response.data) {
+          this.error = e.response.data.error || e.message;
+        } else {
+          this.error = e.message;
+        }
+      } finally {
+        this.loading = false;
+      }
+    }
   }
-
-  loading.value = true;
-  try {
-    const data = await doLogin(username.value.trim());
-    
-    const userId = data.id || data.identifier; 
-
-    localStorage.setItem('userId', userId);
-
-    emit('loginSuccess');
-    
-  } catch (e) {
-    error.value = e.message;
-  } finally {
-    loading.value = false;
-  }
-}
+};
 </script>
 
 <style scoped>

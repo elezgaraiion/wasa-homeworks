@@ -25,43 +25,50 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue';
-import { getConversations, forwardMessage } from '../services/api';
-
-const props = defineProps(['message', 'sourceChatId']);
-const emit = defineEmits(['close', 'forwarded']);
-
-const DEFAULT_AVATAR = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
-const conversations = ref([]);
-const loading = ref(true);
-
-onMounted(async () => {
-  try {
-    const res = await getConversations();
-    conversations.value = res || [];
-  } catch (e) {
-    console.error(e);
-  } finally {
-    loading.value = false;
+<script>
+export default {
+  name: "ForwardModal",
+  props: ['message', 'sourceChatId'],
+  emits: ['close', 'forwarded'],
+  data() {
+    return {
+      conversations: [],
+      loading: true,
+      DEFAULT_AVATAR: 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'
+    };
+  },
+  async mounted() {
+    try {
+      const res = await this.$axios.get('/conversations');
+      this.conversations = res.data || [];
+    } catch (e) {
+      console.error(e);
+    } finally {
+      this.loading = false;
+    }
+  },
+  methods: {
+    async handleForward(targetChat) {
+      if (!confirm(`Forward to ${targetChat.name}?`)) return;
+      
+      try {
+        const msgId = this.message.id || this.message.ID;
+        
+        // We use the same endpoint logic we defined previously
+        await this.$axios.post(`/conversations/${this.sourceChatId}/messages/${msgId}`, {
+            targetConversationId: targetChat.id
+        });
+        
+        alert("Message forwarded");
+        this.$emit('forwarded'); 
+        this.$emit('close');
+      } catch (e) {
+        const errorMsg = e.response?.data?.error || e.message;
+        alert("Error forwarding: " + errorMsg);
+      }
+    }
   }
-});
-
-async function handleForward(targetChat) {
-  if (!confirm(`Forward to ${targetChat.name}?`)) return;
-  
-  try {
-    const msgId = props.message.id || props.message.ID;
-    
-    await forwardMessage(props.sourceChatId, msgId, targetChat.id);
-    
-    alert("Message forwarded");
-    emit('forwarded'); 
-    emit('close');
-  } catch (e) {
-    alert("Error forwarding: " + e.message);
-  }
-}
+};
 </script>
 
 <style scoped>

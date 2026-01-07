@@ -4,70 +4,73 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"github.com/julienschmidt/httprouter"
-	"os"
-	"image"
 
+	"github.com/aritz/wasa-homeworks/service/api/reqcontext"
+	"github.com/julienschmidt/httprouter"
 )
 
-func (rt *_router) doGetCurrentUser(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-    userID := r.Header.Get("Authorization")
-    
-    if userID == "" {
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusUnauthorized)
-        json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})       
-        return
-    }
+func (rt *_router) doGetCurrentUser(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
+	userHeader := r.Header.Get("Authorization")
+	userID := extractBearer(userHeader)
+	if userID == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})
+		return
+	}
 
-    user, err := rt.db.GetUserByID(userID)
-    if err != nil {
-        http.Error(w, "user not found", http.StatusNotFound)
-        return
-    }
+	user, err := rt.db.GetUserByID(userID)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("GetUserByID failed")
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(user)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
 }
 
-func (rt *_router) updateMyUserName(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	
-		userID := r.Header.Get("Authorization")
-		if userID == "" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-	
-		var req struct {
-			Name string `json:"name"`
-		}
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil || len(req.Name) < 1 || len(req.Name) > 50 {
-			http.Error(w, "bad request", http.StatusBadRequest)
-			return
-		}
-	
-		updatedUser, err := rt.db.UpdateUserName(userID, req.Name)
-		if err != nil {
-			if err.Error() == "user with that name already exists" {
-				http.Error(w, err.Error(), http.StatusConflict)
-				return
-			}
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
-	
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(updatedUser)
-	}
-func (rt *_router) updatePhoto(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	userID := r.Header.Get("Authorization")
+func (rt *_router) updateMyUserName(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
+	userHeader := r.Header.Get("Authorization")
+	userID := extractBearer(userHeader)
 	if userID == "" {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	err := r.ParseMultipartForm(10 << 20) 
+	var req struct {
+		Name string `json:"name"`
+	}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil || len(req.Name) < 1 || len(req.Name) > 50 {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	updatedUser, err := rt.db.UpdateUserName(userID, req.Name)
+	if err != nil {
+		if err.Error() == "user with that name already exists" {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		ctx.Logger.WithError(err).Error("UpdateUserName failed")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updatedUser)
+}
+
+func (rt *_router) updatePhoto(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
+	userHeader := r.Header.Get("Authorization")
+	userID := extractBearer(userHeader)
+	if userID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -75,7 +78,7 @@ func (rt *_router) updatePhoto(w http.ResponseWriter, r *http.Request, _ httprou
 
 	file, handler, err := r.FormFile("photoFile")
 	if err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, "bad request: missing photoFile", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
@@ -85,27 +88,17 @@ func (rt *_router) updatePhoto(w http.ResponseWriter, r *http.Request, _ httprou
 		http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
 		return
 	}
-	dst := "/tmp/" + handler.Filename
-	f, err := os.Create(dst)
+
+	photoURL, err := saveImageFile(file, handler)
 	if err != nil {
+		ctx.Logger.WithError(err).Error("saveImageFile failed")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	defer f.Close()
-	_, format, err := image.Decode(file)
-	if err != nil || format != "jpeg" {
-    	http.Error(w, "unsupported media type: only JPEG allowed", http.StatusUnsupportedMediaType)
-    	return
-	}
 
-	_, err = file.Seek(0, 0)
+	user, err := rt.db.UpdateMyPhoto(userID, photoURL)
 	if err != nil {
-    	http.Error(w, "internal server error", http.StatusInternalServerError)
-    	return
-	}
-
-	user, err := rt.db.UpdateMyPhoto(userID, dst)
-	if err != nil {
+		ctx.Logger.WithError(err).Error("UpdateMyPhoto failed")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}

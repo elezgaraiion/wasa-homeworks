@@ -10,7 +10,7 @@
       <div class="avatar-section">
         <label class="avatar-wrapper" title="Click to change photo">
           <img 
-            :src="previewPhoto || currentAvatar" 
+            :src="previewPhoto || getMyAvatarUrl()" 
             @error="handleImageError"
             class="avatar-img" 
             alt="Profile"
@@ -20,7 +20,7 @@
             <span class="camera-icon">📷</span>
           </div>
 
-          <input type="file" @change="handleFileChange" accept="image/jpeg" hidden />
+          <input type="file" @change="handleFileChange" accept="image/jpeg,image/png" hidden />
         </label>
         
         <p class="avatar-hint">Click the image to change it</p>
@@ -41,7 +41,7 @@
         <div class="info-group">
           <label>User ID</label>
           <div class="id-box">
-            {{ store.currentUser?.id || '...' }}
+            {{ currentId }}
             <span class="copy-icon" title="Copy ID">📋</span>
           </div>
         </div>
@@ -62,65 +62,93 @@
   </div>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
-import { store } from '../store.js';
-import { updateUserName, updatePhoto } from '../services/api';
+<script>
+export default {
+  name: "ProfileEdit",
+  emits: ['close'],
+  data() {
+    return {
+      newName: '',
+      previewPhoto: null,
+      loading: false,
+      currentUser: null,
+      DEFAULT_AVATAR: 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'
+    };
+  },
+  computed: {
+    currentId() {
+      return this.currentUser?.id || '...';
+    },
+    isNameChanged() {
+      const currentName = this.currentUser?.name || this.currentUser?.Name;
+      return this.newName.trim() !== '' && this.newName !== currentName;
+    }
+  },
+  async mounted() {
+    try {
+      const response = await this.$axios.get('/me');
+      this.currentUser = response.data;
+      this.newName = this.currentUser.name || this.currentUser.Name || '';
+    } catch (e) {
+      console.error(e);
+    }
+  },
+  methods: {
+    handleImageError(e) {
+      e.target.src = this.DEFAULT_AVATAR;
+    },
 
-const DEFAULT_AVATAR = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
+    getMyAvatarUrl() {
+        const path = this.currentUser?.photo || this.currentUser?.Photo;
+        if (!path) return this.DEFAULT_AVATAR;
+        
+        let fullUrl = path;
+        if (!path.startsWith('http')) {
+             fullUrl = this.$axios.defaults.baseURL + path;
+        }
+        
+        return fullUrl + '?t=' + new Date().getTime();
+    },
 
-const emit = defineEmits(['close']);
+    async saveName() {
+      if (!this.isNameChanged) return;
+      
+      this.loading = true;
+      try {
+        const response = await this.$axios.put('/me/username', { name: this.newName });
+        this.currentUser = response.data; 
+        alert('Name updated successfully');
+        window.location.reload();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      } finally {
+        this.loading = false;
+      }
+    },
 
-const newName = ref(store.currentUser?.name || store.currentUser?.Name || '');
-const previewPhoto = ref(null);
-const loading = ref(false);
+    async handleFileChange(event) {
+      const file = event.target.files[0];
+      if (!file) return;
 
-const currentAvatar = computed(() => {
-  const u = store.currentUser;
-  return u?.photo || u?.Photo || DEFAULT_AVATAR;
-});
+      this.previewPhoto = URL.createObjectURL(file);
+      this.loading = true;
 
-function handleImageError(e) {
-  e.target.src = DEFAULT_AVATAR;
-}
-
-const isNameChanged = computed(() => {
-  const currentName = store.currentUser?.name || store.currentUser?.Name;
-  return newName.value.trim() !== '' && newName.value !== currentName;
-});
-
-async function saveName() {
-  if (!isNameChanged.value) return;
-  
-  loading.value = true;
-  try {
-    const updatedUser = await updateUserName(newName.value);
-    store.updateUser(updatedUser);
-    alert('Name updated successfully');
-  } catch (e) {
-    alert('Error: ' + e.message);
-  } finally {
-    loading.value = false;
+      try {
+        const formData = new FormData();
+        formData.append('photoFile', file);
+        
+        const response = await this.$axios.put('/me/photo', formData);
+        this.currentUser = response.data;
+        window.location.reload();
+      } catch (e) {
+        alert('Error uploading image: ' + e.message);
+        this.previewPhoto = null; 
+      } finally {
+        this.loading = false;
+      }
+    }
   }
-}
-
-async function handleFileChange(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  previewPhoto.value = URL.createObjectURL(file);
-  loading.value = true;
-
-  try {
-    const updatedUser = await updatePhoto(file);
-    store.updateUser(updatedUser);
-  } catch (e) {
-    alert('Error uploading image: ' + e.message);
-    previewPhoto.value = null; 
-  } finally {
-    loading.value = false;
-  }
-}
+};
 </script>
 
 <style scoped>

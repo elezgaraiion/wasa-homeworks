@@ -3,27 +3,32 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"fmt"
+
+	"github.com/aritz/wasa-homeworks/service/api/reqcontext" 
 	"github.com/julienschmidt/httprouter"
 )
 
-func (rt *_router) listOrSearchUsers(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	userID := r.Header.Get("Authorization")
+func (rt *_router) listOrSearchUsers(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
+	userHeader := r.Header.Get("Authorization")
+	userID := extractBearer(userHeader)
 	if userID == "" {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	q := r.URL.Query().Get("q") 
-users, err := rt.db.ListUsers(q, userID)
-if err != nil {
-    http.Error(w, "internal server error", http.StatusInternalServerError)
-    return
+	q := r.URL.Query().Get("q")
+	users, err := rt.db.ListUsers(q, userID)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("ListUsers DB error")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(users)
 }
-json.NewEncoder(w).Encode(users)
-}
-func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params)  {
-	userID := r.Header.Get("Authorization")
+
+func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
+	userHeader := r.Header.Get("Authorization")
+	userID := extractBearer(userHeader)
 	if userID == "" {
 		http.Error(w, "Unauthorized", 401)
 		return
@@ -35,6 +40,7 @@ func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprou
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		ctx.Logger.WithError(err).Error("Invalid JSON in createGroup")
 		http.Error(w, "Invalid JSON", 400)
 		return
 	}
@@ -45,7 +51,7 @@ func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprou
 
 	conv, err := rt.db.CreateGroup(userID, body.Name, body.Users)
 	if err != nil {
-		fmt.Println("CREATE GROUP ERROR:", err)
+		ctx.Logger.WithError(err).Error("CreateGroup DB error")
 		http.Error(w, "Internal Server Error", 500)
 		return
 	}

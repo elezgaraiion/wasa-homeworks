@@ -8,7 +8,7 @@
 
       <div class="avatar-section">
         <div class="avatar-wrapper">
-          <img :src="user.photo || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" class="avatar-img" />
+          <img :src="resolveUrl(user.photo) || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" class="avatar-img" />
         </div>
       </div>
 
@@ -29,29 +29,40 @@
   </div>
 </template>
 
-<script setup>
-import { ref } from 'vue';
-import { createPrivateChat } from '../services/api';
+<script>
+export default {
+  name: "UserProfileReadOnly",
+  props: ['user'],
+  emits: ['close', 'chatStarted'],
+  data() {
+    return {
+      loading: false
+    };
+  },
+  methods: {
+    resolveUrl(path) {
+        if (!path) return '';
+        if (path.startsWith('http')) return path;
+        return this.$axios.defaults.baseURL + path;
+    },
+    async handleEnterChat() {
+      this.loading = true;
+      try {
+        const targetId = this.user.id || this.user.ID;
+        
+        const response = await this.$axios.post('/chats', { targetUserId: targetId });
+        const chat = response.data;
 
-const props = defineProps(['user']);
-const emit = defineEmits(['close', 'chatStarted']);
-const loading = ref(false);
-
-async function handleEnterChat() {
-  loading.value = true;
-  try {
-    const targetId = props.user.id || props.user.ID;
-    const chat = await createPrivateChat(targetId);
-
-    emit('chatStarted', chat);
-    
-    emit('close');
-  } catch (e) {
-    alert("Error opening chat: " + e.message);
-  } finally {
-    loading.value = false;
+        this.$emit('chatStarted', chat);
+        this.$emit('close');
+      } catch (e) {
+        alert("Error opening chat: " + e.message);
+      } finally {
+        this.loading = false;
+      }
+    }
   }
-}
+};
 </script>
 
 <style scoped>

@@ -66,70 +66,80 @@
   </div>
 </template>
 
-<script setup>
-import { ref, watch } from 'vue';
-import { searchUsers, createGroup } from '../services/api';
+<script>
+export default {
+  name: "CreateGroupModal",
+  emits: ['close', 'groupCreated'],
+  data() {
+    return {
+      groupName: '',
+      query: '',
+      searchResults: [],
+      selectedUsers: [],
+      loading: false,
+      creating: false,
+      DEFAULT_AVATAR: 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'
+    };
+  },
+  watch: {
+    async query(newVal) {
+      if (!newVal.trim()) {
+        this.searchResults = [];
+        return;
+      }
+      this.loading = true;
+      try {
+        const response = await this.$axios.get('/users', { params: { q: newVal } });
+        this.searchResults = response.data || [];
+      } catch (e) {
+        console.error(e);
+      } finally {
+        this.loading = false;
+      }
+    }
+  },
+  methods: {
+    isSelected(userId) {
+      return this.selectedUsers.some(u => (u.id || u.ID) === userId);
+    },
 
-const emit = defineEmits(['close', 'groupCreated']);
+    selectUser(user) {
+      const uid = user.id || user.ID;
+      if (this.isSelected(uid)) return; 
+      this.selectedUsers.push(user);
+      this.query = ''; 
+      this.searchResults = [];
+    },
 
-const DEFAULT_AVATAR = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
+    removeUser(userId) {
+      this.selectedUsers = this.selectedUsers.filter(u => (u.id || u.ID) !== userId);
+    },
 
-const groupName = ref('');
-const query = ref('');
-const searchResults = ref([]);
-const selectedUsers = ref([]); 
-const loading = ref(false);
-const creating = ref(false);
+    async handleCreateGroup() {
+      if (!this.groupName.trim() || this.selectedUsers.length === 0) return;
+      
+      this.creating = true;
+      try {
+        const userIds = this.selectedUsers.map(u => u.id || u.ID);
+        
+        const response = await this.$axios.post('/conversations', { 
+            name: this.groupName, 
+            users: userIds 
+        });
+        
+        const newGroupChat = response.data;
+        
+        this.$emit('groupCreated', newGroupChat);
+        this.$emit('close');
 
-watch(query, async (newVal) => {
-  if (!newVal.trim()) {
-    searchResults.value = [];
-    return;
+      } catch (e) {
+        alert('Error creating group: ' + e.message);
+      } finally {
+        this.creating = false;
+      }
+    }
   }
-  loading.value = true;
-  try {
-    searchResults.value = await searchUsers(newVal);
-  } catch (e) {
-    console.error(e);
-  } finally {
-    loading.value = false;
-  }
-});
-
-function isSelected(userId) {
-  return selectedUsers.value.some(u => (u.id || u.ID) === userId);
-}
-
-function selectUser(user) {
-  const uid = user.id || user.ID;
-  if (isSelected(uid)) return; 
-  selectedUsers.value.push(user);
-  query.value = ''; 
-  searchResults.value = [];
-}
-
-function removeUser(userId) {
-  selectedUsers.value = selectedUsers.value.filter(u => (u.id || u.ID) !== userId);
-}
-
-async function handleCreateGroup() {
-  if (!groupName.value.trim() || selectedUsers.value.length === 0) return;
-  
-  creating.value = true;
-  try {
-    const userIds = selectedUsers.value.map(u => u.id || u.ID);
-    
-    const newGroupChat = await createGroup(groupName.value, userIds);
-    
-    emit('groupCreated', newGroupChat);
-    emit('close');
-
-  } catch (e) {
-    alert('Error creating group: ' + e.message);
-  } finally {
-    creating.value = false;
-  }
-}
+};
 </script>
 
 <style scoped>

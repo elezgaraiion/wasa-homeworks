@@ -32,8 +32,6 @@ components:
       scheme: bearer
       bearerFormat: "user-id"
 
-
-
   schemas:
 
     ErrorResponse:
@@ -337,6 +335,7 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    
     UnsupportedMediaType:
       description: Unsupported Media Type
       content:
@@ -344,6 +343,14 @@ components:
           schema:
             type: string
             example: "unsupported media type: only JPEG allowed"
+
+    # --- AQUÍ ESTABA EL ERROR: FALTABA ESTA DEFINICIÓN ---
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
 
 
 paths:
@@ -588,7 +595,7 @@ paths:
                   type: array
                   description: List of user IDs to invite.
                   minItems: 0
-                  maxItems: 511 # Ajustado para coincidir con tu lógica DB (max 511 invitados)
+                  maxItems: 511
                   items:
                     type: string
                     description: User identifier.
@@ -997,7 +1004,7 @@ paths:
           $ref: "#/components/responses/NotFound"
         '500':
           $ref: "#/components/responses/InternalServerError"
-          
+
   /conversations/{conversationId}/users:
     post:
       tags:
@@ -1108,7 +1115,6 @@ paths:
                   example: "New Group Name"
                   minLength: 1
                   maxLength: 100
-                  # Se ha eliminado el pattern porque el código Go solo valida longitud.
               required:
                 - name
       responses:
@@ -1181,6 +1187,7 @@ paths:
         '500':
           description: Internal Server Error (or attempt to update private chat).
           $ref: "#/components/responses/InternalServerError"
+  
   /chats:
     post:
       tags:

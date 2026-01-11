@@ -126,15 +126,37 @@ export default {
         : date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
     },
     handleLogout() {
-      if (confirm('Log out?')) {
-          localStorage.removeItem('userId');
-          this.$router.push('/login');
-      }
+      localStorage.removeItem('userId');
+      this.$router.push('/login');
     },
     async loadConversations() {
       try {
         const res = await this.$axios.get('/conversations');
-        this.conversations = res.data || [];
+        const newChats = res.data || [];
+
+        // TRUCO VISUAL:
+        // Si ya tenemos chats cargados, comparamos las fechas.
+        // Si el chat nuevo tiene una fecha MÁS ANTIGUA que la que tengo en memoria,
+        // significa que se ha borrado el último mensaje.
+        // Mantenemos la fecha "falsa" (la actual) para que no baje de posición.
+        
+        if (this.conversations.length > 0) {
+            newChats.forEach(newC => {
+                const oldC = this.conversations.find(c => c.id === newC.id);
+                if (oldC) {
+                    const oldDate = new Date(oldC.lastMessageAt || oldC.LastMessageAt).getTime();
+                    const newDate = new Date(newC.lastMessageAt || newC.LastMessageAt).getTime();
+                    
+                    // Si la fecha nueva es menor (más vieja) que la que tenía, conservo la mía
+                    if (newDate < oldDate && !isNaN(oldDate)) {
+                        newC.lastMessageAt = oldC.lastMessageAt;
+                        newC.LastMessageAt = oldC.LastMessageAt;
+                    }
+                }
+            });
+        }
+        
+        this.conversations = newChats;
       } catch (error) {
         console.error("Error chats:", error);
       } finally {

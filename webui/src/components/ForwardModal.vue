@@ -48,9 +48,7 @@ export default {
     }
   },
   methods: {
-    async handleForward(targetChat) {
-      if (!confirm(`Forward to ${targetChat.name}?`)) return;
-      
+    async handleForward(targetChat) {      
       try {
         const msgId = this.message.id || this.message.ID;
         
@@ -59,7 +57,6 @@ export default {
             targetConversationId: targetChat.id
         });
         
-        alert("Message forwarded");
         this.$emit('forwarded'); 
         this.$emit('close');
       } catch (e) {

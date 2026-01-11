@@ -456,7 +456,6 @@ export default {
       this.loadMessages(true);
     },
     async handleDelete(msg) {
-      if (!confirm("Delete?")) return;
       this.activeMenuMessageId = null;
       try {
         await this.$axios.delete(`/conversations/${this.chat.id}/messages/${msg.id || msg.ID}`);

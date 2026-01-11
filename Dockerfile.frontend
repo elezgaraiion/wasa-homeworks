@@ -4,11 +4,12 @@
 # Execute the Dockerfile.frontend using ->
 # docker run -it -p 8080:80 --rm aritz-frontend:latest
 
-FROM node:lts as frontend_compiler
+FROM node:20 as frontend_compiler
 WORKDIR /src/webui
+COPY webui/package.json webui/yarn.lock ./
+RUN yarn install
 COPY webui .
-RUN npm run build-prod
-
+RUN yarn build
 FROM nginx:latest
 COPY --from=frontend_compiler /src/webui/dist /usr/share/nginx/html
 EXPOSE 80

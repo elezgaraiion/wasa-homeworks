@@ -190,7 +190,6 @@ export default {
     },
 
     async handleLeaveGroup() {
-      if(!confirm("Are you sure you want to leave?")) return;
       try {
         await this.$axios.delete(`/conversations/${this.chatId}/users/me`);
         this.$emit('chatUpdated');

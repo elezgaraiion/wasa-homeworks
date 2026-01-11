@@ -3,7 +3,6 @@
 #
 # Execute the Dockerfile.backend using ->
 # docker run -it -p 3000:3000 --rm aritz-backend:latest (*)
-# (*) Since we don't care about having persistent data we don't need a volume (-v)
 
 FROM golang:1.19.4 as backend_compiler
 RUN mkdir /Executable/

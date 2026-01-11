@@ -2,7 +2,7 @@
   <div class="login-container">
     
     <div class="intro-layer" :class="{ 'blurred': showInput }">
-      <h1 class="giant-title">WASA<br>PROJECT</h1>
+      <h1 class="giant-title">GUATXAP<br></h1>
       
       <transition name="fade">
         <button v-if="!showInput" @click="startInteraction" class="btn-start">

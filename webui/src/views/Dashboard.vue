@@ -34,9 +34,8 @@
           width="100" 
           class="placeholder-img"
         />
-        <h2>WASA Web</h2>
-        <p>Send and receive messages without connecting your phone.</p>
-        <p class="encrypted-text">🔒 End-to-end encryption (lie, it's a class project)</p>
+        <h2>GUATXAP</h2>
+        <p>Send and receive messages.</p>
       </div>
 
     </main>

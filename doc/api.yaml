@@ -74,7 +74,7 @@ components:
           minLength: 1
           maxLength: 2048
           pattern: '^https?://.+$'
-      required: [id, name]
+      required: [name]
 
     Conversation:
       type: object
@@ -180,6 +180,25 @@ components:
           description: Timestamp when the reaction was added (ISO 8601).
           example: "2025-11-08T15:00:00Z"
       required: [id, user, emoji, createdAt]
+    MessageSnapshot:
+      type: object
+      description: A simplified view of a message used in replies/quotes.
+      properties:
+        id:
+          type: string
+          description: The ID of the original message (might not exist anymore).
+        text:
+          type: string
+        photo:
+          type: string
+          format: uri
+        sender:
+          type: object
+          properties:
+            name:
+              type: string
+              example: "Maria"
+          description: Only contains the sender's name at the time of the snapshot.
 
     Message:
       type: object
@@ -224,8 +243,9 @@ components:
           maxLength: 64
           pattern: '^$|[A-Za-z0-9_-]+$'
         replyTo:
-          description: Full object of the message being replied to.
-          $ref: "#/components/schemas/Message"
+          description: Snapshot content of the message being replied to.
+          $ref: "#/components/schemas/MessageSnapshot"
+          
         createdAt:
           type: string
           format: date-time
@@ -748,18 +768,18 @@ paths:
                   type: string
                   description: Text content of the message.
                   example: "Hello everyone"
-                photoUrl:
+                photo:
                   type: string
                   format: uri
                   description: URL of a photo to attach to the message.
                   example: "https://example.com/pic.jpg"
                 replyToMessageId:
                   type: string
-                  description: Identifier of the message being replied to, if any.
+                  description: Identifier of the message being replied to. It will create a snapshot of the content.
                   example: "msg000"
               anyOf:
                 - required: ["text"]
-                - required: ["photoUrl"]
+                - required: ["photo"]
       responses:
         '201':
           description: Message sent successfully.

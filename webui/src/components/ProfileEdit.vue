@@ -117,10 +117,8 @@ export default {
       try {
         const response = await this.$axios.put('/me/username', { name: this.newName });
         this.currentUser = response.data; 
-        alert('Name updated successfully');
         window.location.reload();
       } catch (e) {
-        alert('Error: ' + e.message);
       } finally {
         this.loading = false;
       }
@@ -141,7 +139,6 @@ export default {
         this.currentUser = response.data;
         window.location.reload();
       } catch (e) {
-        alert('Error uploading image: ' + e.message);
         this.previewPhoto = null; 
       } finally {
         this.loading = false;

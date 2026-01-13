@@ -61,7 +61,6 @@ export default {
         this.$emit('close');
       } catch (e) {
         const errorMsg = e.response?.data?.error || e.message;
-        alert("Error forwarding: " + errorMsg);
       }
     }
   }

@@ -319,7 +319,6 @@ export default {
         this.$nextTick(() => this.$refs.inputRef?.focus());
       } catch (e) {
         console.error(e);
-        alert("Failed to send message.");
         this.newMessage = tempText;
       } finally {
         this.sending = false;
@@ -432,7 +431,6 @@ export default {
         }
       } catch (e) {
         console.error(e);
-        alert("Error reacting");
       }
     },
     toggleMenu(msgId) {
@@ -458,7 +456,6 @@ export default {
         await this.$axios.delete(`/conversations/${this.chat.id}/messages/${msg.id || msg.ID}`);
         this.messages = this.messages.filter(m => (m.id || m.ID) !== (msg.id || msg.ID));
       } catch (e) {
-        alert("Error");
       }
     },
     startReply(msg) {

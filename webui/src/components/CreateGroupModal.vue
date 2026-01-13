@@ -133,7 +133,6 @@ export default {
         this.$emit('close');
 
       } catch (e) {
-        alert('Error creating group: ' + e.message);
       } finally {
         this.creating = false;
       }

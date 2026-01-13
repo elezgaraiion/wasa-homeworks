@@ -56,7 +56,6 @@ export default {
         this.$emit('chatStarted', chat);
         this.$emit('close');
       } catch (e) {
-        alert("Error opening chat: " + e.message);
       } finally {
         this.loading = false;
       }

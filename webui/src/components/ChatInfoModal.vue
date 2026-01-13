@@ -144,10 +144,8 @@ export default {
         this.searchQuery = '';
         this.searchResults = [];
         this.$emit('chatUpdated');
-        alert(`${user.name} added.`);
       } catch (e) { 
         console.error(e);
-        alert("Error adding user: " + (e.response?.data?.error || e.message)); 
       }
     },
 
@@ -170,7 +168,6 @@ export default {
         this.$emit('chatUpdated', { type: 'name', value: updated.name });
         
       } catch (e) {
-        alert("Error changing name.");
       }
     },
 
@@ -186,7 +183,7 @@ export default {
         this.localChat.photo = newPhotoUrl;
         
         this.$emit('chatUpdated', { type: 'photo', value: newPhotoUrl });
-      } catch (e) { alert("Error uploading photo."); }
+      } catch (e) { }
     },
 
     async handleLeaveGroup() {
@@ -195,7 +192,7 @@ export default {
         this.$emit('chatUpdated');
         this.$emit('close');
         window.location.reload(); 
-      } catch (e) { alert("Error leaving."); }
+      } catch (e) {  }
     }
   }
 };

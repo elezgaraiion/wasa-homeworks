@@ -7,10 +7,6 @@ info:
     Includes simplified login, user management, conversations, messages, and group handling.
   version: 1.0.0
 
-servers:
-  - url: http://localhost:3000/api/v1
-    description: Local Development Server
-
 security:
   - bearerAuth: []
 

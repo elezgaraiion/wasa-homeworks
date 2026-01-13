@@ -101,7 +101,7 @@ export default {
         if (newChat) {
           this.localChat = { ...newChat };
           this.isGroup = newChat.type === 'group';
-          this.participantsList = newChat.participants || [];
+          this.participantsList = [...(newChat.participants || [])];
         }
       }
     }

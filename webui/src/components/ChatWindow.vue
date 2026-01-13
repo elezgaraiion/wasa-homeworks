@@ -326,10 +326,7 @@ export default {
       }
     },
     handleChatUpdated(updateInfo) {
-      if (updateInfo) {
-        if (updateInfo.type === 'name') this.chat.name = updateInfo.value;
-        if (updateInfo.type === 'photo') this.chat.photo = updateInfo.value;
-      }
+      
       this.$emit('refresh');
       this.loadMessages(true);
     },

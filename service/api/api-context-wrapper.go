@@ -1,11 +1,12 @@
 package api
 
 import (
+	"net/http"
+
+	"github.com/aritz/wasa-homeworks/service/api/reqcontext"
 	"github.com/gofrs/uuid"
 	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
-	"net/http"
-	"github.com/aritz/wasa-homeworks/service/api/reqcontext"
 )
 
 type httpRouterHandler func(http.ResponseWriter, *http.Request, httprouter.Params, reqcontext.RequestContext)
@@ -15,7 +16,7 @@ func (rt *_router) wrap(fn httpRouterHandler) func(http.ResponseWriter, *http.Re
 		reqUUID, err := uuid.NewV4()
 		if err != nil {
 			rt.baseLogger.WithError(err).Error("can't generate a request UUID")
-			w.WriteHeader(http.StatusInternalServerError)
+			rt.jsonError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 		var ctx = reqcontext.RequestContext{

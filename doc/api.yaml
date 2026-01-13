@@ -7,6 +7,10 @@ info:
     Includes simplified login, user management, conversations, messages, and group handling.
   version: 1.0.0
 
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local Development Server
+
 security:
   - bearerAuth: []
 
@@ -93,7 +97,7 @@ components:
           enum: [direct, group]
           example: "group"
           minLength: 5
-          maxLength: 5
+          maxLength: 6
           pattern: '^(direct|group)$'
         name:
           type: string
@@ -135,11 +139,15 @@ components:
           example: "Juan"
           minLength: 1
           maxLength: 50
+          pattern: '^[A-Za-zÀ-ÿ0-9 .''-]{1,50}$'
         lastMessageStatus:
           type: string
           description: Status of the last message.
           enum: [delivered, read]
           example: "read"
+          minLength: 4
+          maxLength: 9
+          pattern: '^(delivered|read)$'
         unreadCount:
           type: integer
           description: Number of unread messages for the requesting user.
@@ -180,6 +188,7 @@ components:
           description: Timestamp when the reaction was added (ISO 8601).
           example: "2025-11-08T15:00:00Z"
       required: [id, user, emoji, createdAt]
+
     MessageSnapshot:
       type: object
       description: A simplified view of a message used in replies/quotes.
@@ -187,18 +196,32 @@ components:
         id:
           type: string
           description: The ID of the original message (might not exist anymore).
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Za-z0-9_-]+$'
         text:
           type: string
+          description: Text content snapshot.
+          minLength: 0
+          maxLength: 4096
+          pattern: '^[\s\S]*$'
         photo:
           type: string
           format: uri
+          description: Photo URL snapshot.
+          minLength: 0
+          maxLength: 2048
+          pattern: '^$|https?://.+$'
         sender:
           type: object
+          description: Only contains the sender's name at the time of the snapshot.
           properties:
             name:
               type: string
               example: "Maria"
-          description: Only contains the sender's name at the time of the snapshot.
+              minLength: 1
+              maxLength: 50
+              pattern: '^[A-Za-zÀ-ÿ0-9 .''-]{1,50}$'
 
     Message:
       type: object
@@ -243,7 +266,6 @@ components:
           maxLength: 64
           pattern: '^$|[A-Za-z0-9_-]+$'
         replyTo:
-          description: Snapshot content of the message being replied to.
           $ref: "#/components/schemas/MessageSnapshot"
           
         createdAt:
@@ -292,18 +314,6 @@ components:
       schema:
         type: string
         example: "msg001"
-        minLength: 1
-        maxLength: 64
-        pattern: '^[A-Za-z0-9_-]+$'
-
-    GroupId:
-      name: groupId
-      in: path
-      required: true
-      description: Group ID.
-      schema:
-        type: string
-        example: "group123"
         minLength: 1
         maxLength: 64
         pattern: '^[A-Za-z0-9_-]+$'
@@ -364,14 +374,12 @@ components:
             type: string
             example: "unsupported media type: only JPEG allowed"
 
-    # --- AQUÍ ESTABA EL ERROR: FALTABA ESTA DEFINICIÓN ---
     InternalServerError:
       description: Internal Server Error
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-
 
 paths:
 
@@ -452,7 +460,7 @@ paths:
     put:
       summary: Update user name
       description: Change the authenticated user's display name.
-      operationId: updateMyUserName
+      operationId: setMyUserName
       tags:
         - Profile
       security:
@@ -493,7 +501,7 @@ paths:
     put:
       summary: Update profile photo
       description: Upload and set a new profile photo. Only **JPEG** images are allowed.
-      operationId: updatePhoto
+      operationId: setMyPhoto
       tags:
         - Profile
       security:
@@ -648,7 +656,7 @@ paths:
       description: >
         Retrieve detailed information about a specific conversation.
         If the conversation is 'direct', the name and photo returned are those of the other participant.
-      operationId: getConversationProfile
+      operationId: getConversation
       security:
         - bearerAuth: []
       parameters:
@@ -664,7 +672,10 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         '404':
           description: Conversation not found or user is not a participant.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /conversations/{conversationId}/seen:
     post:
@@ -684,18 +695,26 @@ paths:
           description: Conversation marked as seen successfully. No content returned.
         '400':
           description: Missing conversation ID.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not a participant of this conversation.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           $ref: "#/components/responses/NotFound"
         '500':
           $ref: "#/components/responses/InternalServerError"
 
   /conversations/{conversationId}/messages:
+    parameters:
+        - $ref: "#/components/parameters/ConversationId"
     get:
       tags:
         - Messages
@@ -707,7 +726,6 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: "#/components/parameters/ConversationId"
         - name: limit
           in: query
           description: Maximum number of messages to return.
@@ -734,15 +752,24 @@ paths:
                   $ref: "#/components/schemas/Message"
         '400':
           description: Invalid conversation ID or limit parameter.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not a participant of this conversation.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Conversation not found.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           $ref: "#/components/responses/InternalServerError"
 
@@ -754,8 +781,6 @@ paths:
       operationId: sendMessage
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/ConversationId"
       requestBody:
         required: true
         content:
@@ -789,15 +814,24 @@ paths:
                 $ref: "#/components/schemas/Message"
         '400':
           description: Invalid JSON or missing required content (text or photoUrl).
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not a participant of this conversation.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Conversation not found.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           $ref: "#/components/responses/InternalServerError"
 
@@ -823,15 +857,24 @@ paths:
                 $ref: "#/components/schemas/Message"
         '400':
           description: Missing conversation or message ID.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not a participant of the conversation.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Conversation or message not found.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           $ref: "#/components/responses/InternalServerError"
 
@@ -871,15 +914,24 @@ paths:
                 $ref: "#/components/schemas/Message"
         '400':
           description: Invalid JSON or missing targetConversationId.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not a participant of the source or target conversation.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Source conversation or message not found.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           $ref: "#/components/responses/InternalServerError"
 
@@ -898,15 +950,24 @@ paths:
           description: Message deleted successfully.
         '400':
           description: Missing conversation or message ID.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not the sender of this message or not in the conversation.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Conversation or message not found.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           $ref: "#/components/responses/InternalServerError"
 
@@ -935,12 +996,18 @@ paths:
                   $ref: "#/components/schemas/Reaction"
         '400':
           description: Missing conversation or message ID.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not in the conversation.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           $ref: "#/components/responses/InternalServerError"
 
@@ -952,7 +1019,7 @@ paths:
         Add a reaction to a specific message.
         **Note:** If the user has already reacted to this message, the existing reaction
         will be updated with the new emoji (a user can only have one reaction per message).
-      operationId: addReactionToMessage
+      operationId: commentMessage
       security:
         - bearerAuth: []
       requestBody:
@@ -980,15 +1047,24 @@ paths:
                 $ref: "#/components/schemas/Reaction"
         '400':
           description: Invalid JSON or missing emoji.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not in the conversation.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Conversation or message not found.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           $ref: "#/components/responses/InternalServerError"
 
@@ -1005,7 +1081,7 @@ paths:
       description: >
         Remove a previously added reaction from a message.
         **Restriction:** A user can only remove their own reactions.
-      operationId: removeReactionFromMessage
+      operationId: uncommentMessage
       security:
         - bearerAuth: []
       responses:
@@ -1013,15 +1089,24 @@ paths:
           description: Reaction removed successfully.
         '400':
           description: Missing conversation, message, or reaction ID.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not in the conversation.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Reaction not found (or belongs to another user).
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           $ref: "#/components/responses/InternalServerError"
 
@@ -1035,7 +1120,7 @@ paths:
         Only existing participants can add new members.
         **Note:** If the user is already in the group, the request succeeds (returns 200) without changes.
         **Restriction:** Cannot add users to 'direct' (private) conversations.
-      operationId: addUserToGroup
+      operationId: addToGroup
       security:
         - bearerAuth: []
       parameters:
@@ -1065,18 +1150,30 @@ paths:
                 $ref: "#/components/schemas/Conversation"
         '400':
           description: Missing conversationId or userId.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: Requester is not a participant of this group.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Conversation or Target User not found.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           description: Internal Server Error (or attempt to add user to a private chat).
-          $ref: "#/components/responses/InternalServerError"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /conversations/{conversationId}/users/me:
     delete:
@@ -1096,15 +1193,24 @@ paths:
           description: User left the group successfully.
         '400':
           description: Missing conversation ID.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: Forbidden. The conversation is not a group, or the user is not a participant.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Conversation not found.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           $ref: "#/components/responses/InternalServerError"
 
@@ -1146,18 +1252,30 @@ paths:
                 $ref: "#/components/schemas/Conversation"
         '400':
           description: Invalid name length.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not a participant of the group.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Conversation not found.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           description: Internal Server Error (or attempt to rename private chat).
-          $ref: "#/components/responses/InternalServerError"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /conversations/{conversationId}/photo:
     put:
@@ -1195,18 +1313,30 @@ paths:
                 $ref: "#/components/schemas/Conversation"
         '400':
           description: Missing file or invalid form data.
-          $ref: "#/components/responses/BadRequest"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '401':
           $ref: "#/components/responses/Unauthorized"
         '403':
           description: User is not a participant of the group.
-          $ref: "#/components/responses/Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '404':
           description: Conversation not found.
-          $ref: "#/components/responses/NotFound"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         '500':
           description: Internal Server Error (or attempt to update private chat).
-          $ref: "#/components/responses/InternalServerError"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   
   /chats:
     post:
@@ -1242,10 +1372,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Conversation"
-        '500':
-          description: Internal Server Error (Database error or invalid input).
+        '400':
+          description: Invalid JSON or missing targetUserId.
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-                example: "Error"
+                $ref: "#/components/schemas/ErrorResponse"
+        '401':
+          $ref: "#/components/responses/Unauthorized"
+        '500':
+          $ref: "#/components/responses/InternalServerError"

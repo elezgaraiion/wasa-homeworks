@@ -1,17 +1,19 @@
 package database
 
-import(
+import (
 	"database/sql"
-	"github.com/aritz/wasa-homeworks/service/models"
+	"errors"
 
+	"github.com/aritz/wasa-homeworks/service/models"
 )
+
 func (db *appdbimpl) GetMessageByID(userID, convID, messageID string) (models.Message, error) {
 	var count int
 	err := db.c.QueryRow(`
-		SELECT COUNT(*) 
-		FROM conversation_participants
-		WHERE conversation_id = ? AND user_id = ?
-	`, convID, userID).Scan(&count)
+        SELECT COUNT(*) 
+        FROM conversation_participants
+        WHERE conversation_id = ? AND user_id = ?
+    `, convID, userID).Scan(&count)
 	if err != nil {
 		return models.Message{}, err
 	}
@@ -21,7 +23,7 @@ func (db *appdbimpl) GetMessageByID(userID, convID, messageID string) (models.Me
 
 	var convType string
 	err = db.c.QueryRow(`SELECT type FROM conversations WHERE id = ?`, convID).Scan(&convType)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return models.Message{}, models.ErrConversationNotFound
 	}
 	if err != nil {
@@ -31,12 +33,12 @@ func (db *appdbimpl) GetMessageByID(userID, convID, messageID string) (models.Me
 	var m models.Message
 	var senderID string
 	err = db.c.QueryRow(`
-		SELECT m.id, m.sender_id, u.name, u.photo, m.conversation_id,
-		       m.text, m.photo, m.reply_to_message_id, m.created_at, m.status
-		FROM messages m
-		JOIN users u ON u.id = m.sender_id
-		WHERE m.conversation_id = ? AND m.id = ?
-	`, convID, messageID).Scan(
+        SELECT m.id, m.sender_id, u.name, u.photo, m.conversation_id,
+               m.text, m.photo, m.reply_to_message_id, m.created_at, m.status
+        FROM messages m
+        JOIN users u ON u.id = m.sender_id
+        WHERE m.conversation_id = ? AND m.id = ?
+    `, convID, messageID).Scan(
 		&m.ID,
 		&senderID,
 		&m.Sender.Name,
@@ -48,7 +50,7 @@ func (db *appdbimpl) GetMessageByID(userID, convID, messageID string) (models.Me
 		&m.CreatedAt,
 		&m.Status,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return models.Message{}, models.ErrMessageNotFound
 	}
 	if err != nil {
@@ -57,7 +59,10 @@ func (db *appdbimpl) GetMessageByID(userID, convID, messageID string) (models.Me
 
 	m.Sender.ID = senderID
 
-	m.Reactions, _ = db.GetReactions(m.ID)
+	m.Reactions, err = db.GetReactions(m.ID)
+	if err != nil {
+		return models.Message{}, err
+	}
 
 	if m.Sender.ID == userID {
 		if convType == "private" {

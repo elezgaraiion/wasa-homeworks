@@ -1,10 +1,12 @@
 package database
 
-import(
+import (
+	"database/sql"
+	"errors"
 	"time"
-	"github.com/google/uuid"
+
 	"github.com/aritz/wasa-homeworks/service/models"
-    "database/sql"
+	"github.com/gofrs/uuid"
 )
 
 func (db *appdbimpl) AddReaction(userID, convID, msgID, emoji string) (models.Reaction, error) {
@@ -23,21 +25,26 @@ func (db *appdbimpl) AddReaction(userID, convID, msgID, emoji string) (models.Re
 	err = db.c.QueryRow(`SELECT id FROM reactions WHERE user_id = ? AND message_id = ?`, userID, msgID).Scan(&reactionID)
 
 	now := time.Now().UTC()
-	
-	if err == sql.ErrNoRows {
-		reactionID = uuid.New().String()
+
+	if errors.Is(err, sql.ErrNoRows) {
+		newUUID, err := uuid.NewV4()
+		if err != nil {
+			return models.Reaction{}, err
+		}
+		reactionID = newUUID.String()
+
 		_, err = db.c.Exec(`
-			INSERT INTO reactions(id, user_id, message_id, emoji, created_at)
-			VALUES (?, ?, ?, ?, ?)
-		`, reactionID, userID, msgID, emoji, now.Format(time.RFC3339))
+            INSERT INTO reactions(id, user_id, message_id, emoji, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        `, reactionID, userID, msgID, emoji, now.Format(time.RFC3339))
 		if err != nil {
 			return models.Reaction{}, err
 		}
 	} else if err == nil {
 		_, err = db.c.Exec(`
-			UPDATE reactions SET emoji = ?, created_at = ?
-			WHERE id = ?
-		`, emoji, now.Format(time.RFC3339), reactionID)
+            UPDATE reactions SET emoji = ?, created_at = ?
+            WHERE id = ?
+        `, emoji, now.Format(time.RFC3339), reactionID)
 		if err != nil {
 			return models.Reaction{}, err
 		}
@@ -46,7 +53,10 @@ func (db *appdbimpl) AddReaction(userID, convID, msgID, emoji string) (models.Re
 	}
 
 	var userName string
-	db.c.QueryRow("SELECT name FROM users WHERE id = ?", userID).Scan(&userName)
+	err = db.c.QueryRow("SELECT name FROM users WHERE id = ?", userID).Scan(&userName)
+	if err != nil {
+		return models.Reaction{}, err
+	}
 
 	return models.Reaction{
 		ID:        reactionID,

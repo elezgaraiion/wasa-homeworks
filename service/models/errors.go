@@ -9,4 +9,5 @@ var (
 	ErrReactionNotFound = errors.New("reaction not found")
 	ErrUserAlreadyInConversation = errors.New("user already in conversation")
 	ErrUserNotFound = errors.New("user not found")
+	ErrNameConflict = errors.New("name conflict")
 )

@@ -1,34 +1,35 @@
 package database
 
 import (
-	"time"
-    "sort"
 	"database/sql"
+	"sort"
+	"time"
+
 	"github.com/aritz/wasa-homeworks/service/models"
 )
 
 func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, error) {
 	query := `
-		SELECT 
-			c.id, c.type, c.name, c.photo,
-			c.last_message_preview, c.last_message_at,
-			meta.joined_at,
-			COALESCE(msg.sender_id, ''),
-			COALESCE(msg.status, ''),
-			COALESCE(u_sender.name, ''),
-			(SELECT COUNT(*) 
-			 FROM messages m2 
-			 WHERE m2.conversation_id = c.id 
-			   AND m2.created_at > COALESCE(meta.last_seen_message_at, meta.joined_at)
-			   AND m2.sender_id != ?
-			) AS unread_count
-		FROM conversations c
-		JOIN conversation_participants p ON p.conversation_id = c.id
-		LEFT JOIN conversation_user_meta meta ON meta.conversation_id = c.id AND meta.user_id = ?
-		LEFT JOIN messages msg ON msg.conversation_id = c.id AND msg.created_at = c.last_message_at
-		LEFT JOIN users u_sender ON u_sender.id = msg.sender_id
-		WHERE p.user_id = ?
-	`
+        SELECT 
+            c.id, c.type, c.name, c.photo,
+            c.last_message_preview, c.last_message_at,
+            meta.joined_at,
+            COALESCE(msg.sender_id, ''),
+            COALESCE(msg.status, ''),
+            COALESCE(u_sender.name, ''),
+            (SELECT COUNT(*) 
+             FROM messages m2 
+             WHERE m2.conversation_id = c.id 
+               AND m2.created_at > COALESCE(meta.last_seen_message_at, meta.joined_at)
+               AND m2.sender_id != ?
+            ) AS unread_count
+        FROM conversations c
+        JOIN conversation_participants p ON p.conversation_id = c.id
+        LEFT JOIN conversation_user_meta meta ON meta.conversation_id = c.id AND meta.user_id = ?
+        LEFT JOIN messages msg ON msg.conversation_id = c.id AND msg.created_at = c.last_message_at
+        LEFT JOIN users u_sender ON u_sender.id = msg.sender_id
+        WHERE p.user_id = ?
+    `
 
 	rows, err := db.c.Query(query, userID, userID, userID)
 	if err != nil {
@@ -42,7 +43,7 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, e
 
 	for rows.Next() {
 		var c models.Conversation
-		
+
 		var lastMsgAtStr sql.NullString
 		var joinedAtStr sql.NullString
 		var preview sql.NullString
@@ -62,14 +63,25 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, e
 		}
 
 		c.UnreadCount = unreadCount
-		if name.Valid { c.Name = name.String }
-		if photo.Valid { c.Photo = photo.String }
-		if preview.Valid { c.LastMessagePreview = preview.String }
-		if senderID.Valid { c.LastMessageSenderID = senderID.String }
-		if msgStatus.Valid { c.LastMessageStatus = msgStatus.String }
-		if senderName.Valid { c.LastMessageSenderName = senderName.String }
+		if name.Valid {
+			c.Name = name.String
+		}
+		if photo.Valid {
+			c.Photo = photo.String
+		}
+		if preview.Valid {
+			c.LastMessagePreview = preview.String
+		}
+		if senderID.Valid {
+			c.LastMessageSenderID = senderID.String
+		}
+		if msgStatus.Valid {
+			c.LastMessageStatus = msgStatus.String
+		}
+		if senderName.Valid {
+			c.LastMessageSenderName = senderName.String
+		}
 
-		
 		var tMsg time.Time
 		if lastMsgAtStr.Valid && lastMsgAtStr.String != "" {
 			t, err := time.Parse(time.RFC3339, lastMsgAtStr.String)
@@ -89,25 +101,31 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, e
 			tJoined = t
 		}
 
-		
 		if tMsg.After(tJoined) {
 			c.TempOrderAt = tMsg
 		} else {
 			c.TempOrderAt = tJoined
 		}
 
-		c.Participants, _ = db.getParticipantsByConversation(c.ID)
+		c.Participants, err = db.getParticipantsByConversation(c.ID)
+		if err != nil {
+			return nil, err
+		}
+
 		if c.Type == "direct" {
 			for _, p := range c.Participants {
 				if p.ID != userID {
 					c.Name = p.Name
 					c.Photo = p.Photo
-					break 
+					break
 				}
 			}
 		}
 
 		convs = append(convs, c)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	sort.Slice(convs, func(i, j int) bool {
@@ -119,10 +137,10 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]models.Conversation, e
 
 func (db *appdbimpl) getParticipantsByConversation(convID string) ([]models.User, error) {
 	rows, err := db.c.Query(`
-		SELECT u.id, u.name, u.photo 
-		FROM users u
-		JOIN conversation_participants cp ON cp.user_id = u.id
-		WHERE cp.conversation_id = ?`, convID)
+        SELECT u.id, u.name, u.photo 
+        FROM users u
+        JOIN conversation_participants cp ON cp.user_id = u.id
+        WHERE cp.conversation_id = ?`, convID)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +165,9 @@ func (db *appdbimpl) getParticipantsByConversation(convID string) ([]models.User
 		}
 
 		participants = append(participants, u)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return participants, nil

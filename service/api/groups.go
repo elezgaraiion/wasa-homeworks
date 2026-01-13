@@ -2,10 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
-	"github.com/aritz/wasa-homeworks/service/api/reqcontext" 
+	"github.com/aritz/wasa-homeworks/service/api/reqcontext"
 	"github.com/aritz/wasa-homeworks/service/models"
 	"github.com/julienschmidt/httprouter"
 )
@@ -18,72 +19,74 @@ func (rt *_router) addUserToGroup(w http.ResponseWriter, r *http.Request, ps htt
 	authUserHeader := r.Header.Get("Authorization")
 	authUserID := extractBearer(authUserHeader)
 	if authUserID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		rt.jsonError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	conversationID := ps.ByName("conversationId")
 	if conversationID == "" {
-		http.Error(w, "Missing conversationId", http.StatusBadRequest)
+		rt.jsonError(w, http.StatusBadRequest, "Missing conversationId")
 		return
 	}
 
 	var body addUserToGroupReq
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		rt.jsonError(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
 
 	if body.UserID == "" {
-		http.Error(w, "Missing userId", http.StatusBadRequest)
+		rt.jsonError(w, http.StatusBadRequest, "Missing userId")
 		return
 	}
 
 	conv, err := rt.db.AddUserToGroup(authUserID, conversationID, body.UserID)
 	if err != nil {
-		switch err {
-		case models.ErrForbidden:
-			http.Error(w, "Forbidden", http.StatusForbidden)
-		case models.ErrConversationNotFound:
-			http.Error(w, "Conversation not found", http.StatusNotFound)
-		case models.ErrUserNotFound:
-			http.Error(w, "User not found", http.StatusNotFound)
+		switch {
+		case errors.Is(err, models.ErrForbidden):
+			rt.jsonError(w, http.StatusForbidden, "Forbidden")
+		case errors.Is(err, models.ErrConversationNotFound):
+			rt.jsonError(w, http.StatusNotFound, "Conversation not found")
+		case errors.Is(err, models.ErrUserNotFound):
+			rt.jsonError(w, http.StatusNotFound, "User not found")
 		default:
 			ctx.Logger.WithError(err).Error("AddUserToGroup DB error")
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			rt.jsonError(w, http.StatusInternalServerError, "Internal server error")
 		}
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(conv)
+	if err := json.NewEncoder(w).Encode(conv); err != nil {
+		ctx.Logger.WithError(err).Error("JSON encode failed")
+	}
 }
 
 func (rt *_router) leaveGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	authUserHeader := r.Header.Get("Authorization")
 	authUserID := extractBearer(authUserHeader)
 	if authUserID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		rt.jsonError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	conversationID := ps.ByName("conversationId")
 	if conversationID == "" {
-		http.Error(w, "Missing conversationId", http.StatusBadRequest)
+		rt.jsonError(w, http.StatusBadRequest, "Missing conversationId")
 		return
 	}
 
 	err := rt.db.LeaveGroup(authUserID, conversationID)
 	if err != nil {
-		switch err {
-		case models.ErrConversationNotFound:
-			http.Error(w, "Conversation not found", http.StatusNotFound)
-		case models.ErrForbidden:
-			http.Error(w, "Forbidden", http.StatusForbidden)
+		switch {
+		case errors.Is(err, models.ErrConversationNotFound):
+			rt.jsonError(w, http.StatusNotFound, "Conversation not found")
+		case errors.Is(err, models.ErrForbidden):
+			rt.jsonError(w, http.StatusForbidden, "Forbidden")
 		default:
 			ctx.Logger.WithError(err).Error("LeaveGroup DB error")
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			rt.jsonError(w, http.StatusInternalServerError, "Internal server error")
 		}
 		return
 	}
@@ -99,68 +102,70 @@ func (rt *_router) setGroupName(w http.ResponseWriter, r *http.Request, ps httpr
 	authUserHeader := r.Header.Get("Authorization")
 	authUserID := extractBearer(authUserHeader)
 	if authUserID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		rt.jsonError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	conversationID := ps.ByName("conversationId")
 	if conversationID == "" {
-		http.Error(w, "Missing conversationId", http.StatusBadRequest)
+		rt.jsonError(w, http.StatusBadRequest, "Missing conversationId")
 		return
 	}
 
 	var body setGroupNameReq
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		rt.jsonError(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
 
 	if len(body.Name) == 0 || len(body.Name) > 100 {
-		http.Error(w, "Invalid group name", http.StatusBadRequest)
+		rt.jsonError(w, http.StatusBadRequest, "Invalid group name")
 		return
 	}
 
 	conv, err := rt.db.SetGroupName(authUserID, conversationID, body.Name)
 	if err != nil {
-		switch err {
-		case models.ErrConversationNotFound:
-			http.Error(w, "Conversation not found", http.StatusNotFound)
-		case models.ErrForbidden:
-			http.Error(w, "Forbidden", http.StatusForbidden)
+		switch {
+		case errors.Is(err, models.ErrConversationNotFound):
+			rt.jsonError(w, http.StatusNotFound, "Conversation not found")
+		case errors.Is(err, models.ErrForbidden):
+			rt.jsonError(w, http.StatusForbidden, "Forbidden")
 		default:
 			ctx.Logger.WithError(err).Error("SetGroupName DB error")
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			rt.jsonError(w, http.StatusInternalServerError, "Internal server error")
 		}
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(conv)
+	if err := json.NewEncoder(w).Encode(conv); err != nil {
+		ctx.Logger.WithError(err).Error("JSON encode failed")
+	}
 }
 
 func (rt *_router) setGroupPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	authUserHeader := r.Header.Get("Authorization")
 	authUserID := extractBearer(authUserHeader)
 	if authUserID == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		rt.jsonError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	conversationID := ps.ByName("conversationId")
 	if conversationID == "" {
-		http.Error(w, "Missing conversationId", http.StatusBadRequest)
+		rt.jsonError(w, http.StatusBadRequest, "Missing conversationId")
 		return
 	}
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		rt.jsonError(w, http.StatusBadRequest, "Failed to parse form")
 		return
 	}
 
 	file, handler, err := r.FormFile("photoFile")
 	if err != nil {
-		http.Error(w, "Missing photoFile", http.StatusBadRequest)
+		rt.jsonError(w, http.StatusBadRequest, "Missing photoFile")
 		return
 	}
 	defer file.Close()
@@ -174,25 +179,27 @@ func (rt *_router) setGroupPhoto(w http.ResponseWriter, r *http.Request, ps http
 	photoURL, err := saveImageFile(file, handler)
 	if err != nil {
 		ctx.Logger.WithError(err).Error("SaveImageFile failed")
-		http.Error(w, "Failed to save photo", http.StatusInternalServerError)
+		rt.jsonError(w, http.StatusInternalServerError, "Failed to save photo")
 		return
 	}
 
 	conv, err := rt.db.SetGroupPhoto(authUserID, conversationID, photoURL)
 	if err != nil {
-		switch err {
-		case models.ErrForbidden:
-			http.Error(w, "Forbidden", http.StatusForbidden)
-		case models.ErrConversationNotFound:
-			http.Error(w, "Conversation not found", http.StatusNotFound)
+		switch {
+		case errors.Is(err, models.ErrForbidden):
+			rt.jsonError(w, http.StatusForbidden, "Forbidden")
+		case errors.Is(err, models.ErrConversationNotFound):
+			rt.jsonError(w, http.StatusNotFound, "Conversation not found")
 		default:
 			ctx.Logger.WithError(err).Error("SetGroupPhoto DB error")
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			rt.jsonError(w, http.StatusInternalServerError, "Internal server error")
 		}
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(conv)
+	if err := json.NewEncoder(w).Encode(conv); err != nil {
+		ctx.Logger.WithError(err).Error("JSON encode failed")
+	}
 }

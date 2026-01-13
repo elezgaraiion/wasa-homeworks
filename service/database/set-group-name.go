@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/aritz/wasa-homeworks/service/models"
@@ -10,9 +11,9 @@ import (
 func (db *appdbimpl) SetGroupName(userID, convID, newName string) (models.Conversation, error) {
 	var convType string
 	err := db.c.QueryRow(`
-		SELECT type FROM conversations WHERE id = ?
-	`, convID).Scan(&convType)
-	if err == sql.ErrNoRows {
+        SELECT type FROM conversations WHERE id = ?
+    `, convID).Scan(&convType)
+	if errors.Is(err, sql.ErrNoRows) {
 		return models.Conversation{}, models.ErrConversationNotFound
 	}
 	if err != nil {
@@ -24,9 +25,9 @@ func (db *appdbimpl) SetGroupName(userID, convID, newName string) (models.Conver
 
 	var exists int
 	err = db.c.QueryRow(`
-		SELECT COUNT(*) FROM conversation_participants
-		WHERE conversation_id = ? AND user_id = ?
-	`, convID, userID).Scan(&exists)
+        SELECT COUNT(*) FROM conversation_participants
+        WHERE conversation_id = ? AND user_id = ?
+    `, convID, userID).Scan(&exists)
 	if err != nil {
 		return models.Conversation{}, err
 	}
@@ -35,10 +36,10 @@ func (db *appdbimpl) SetGroupName(userID, convID, newName string) (models.Conver
 	}
 
 	_, err = db.c.Exec(`
-		UPDATE conversations
-		SET name = ?
-		WHERE id = ?
-	`, newName, convID)
+        UPDATE conversations
+        SET name = ?
+        WHERE id = ?
+    `, newName, convID)
 	if err != nil {
 		return models.Conversation{}, err
 	}

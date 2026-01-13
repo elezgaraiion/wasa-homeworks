@@ -1,34 +1,35 @@
 package database
 
-
 import (
 	"database/sql"
-	"github.com/aritz/wasa-homeworks/service/models"
+	"errors"
 	"time"
+
+	"github.com/aritz/wasa-homeworks/service/models"
 )
 
 func (db *appdbimpl) GetMessagesInConversation(
-    userID string,
-    convID string,
-    limit int,
-    before string,
+	userID string,
+	convID string,
+	limit int,
+	before string,
 ) ([]models.Message, error) {
 
-    var joinedAt string
-    err := db.c.QueryRow(`
+	var joinedAt string
+	err := db.c.QueryRow(`
         SELECT joined_at
         FROM conversation_user_meta
         WHERE conversation_id = ? AND user_id = ?
     `, convID, userID).Scan(&joinedAt)
 
-    if err == sql.ErrNoRows { 
-        return nil, models.ErrForbidden 
-    }
-    if err != nil { 
-        return nil, err 
-    }
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, models.ErrForbidden
+	}
+	if err != nil {
+		return nil, err
+	}
 
-    query := `
+	query := `
         SELECT 
             m.id, m.sender_id, u.name, u.photo, m.conversation_id,
             m.text, m.photo, m.reply_to_message_id, m.created_at, m.status,
@@ -38,85 +39,106 @@ func (db *appdbimpl) GetMessagesInConversation(
         LEFT JOIN messages r ON m.reply_to_message_id = r.id
         LEFT JOIN users ru ON r.sender_id = ru.id
         WHERE m.conversation_id = ?
-          AND m.created_at >= ?  -- <--- ESTO ES LO QUE FALTABA
+          AND m.created_at >= ?
     `
-    args := []any{convID, joinedAt}
+	args := []any{convID, joinedAt}
 
-    if before != "" {
-        query += " AND m.created_at < ?"
-        args = append(args, before)
-    }
+	if before != "" {
+		query += " AND m.created_at < ?"
+		args = append(args, before)
+	}
 
-    query += " ORDER BY m.created_at DESC LIMIT ?"
-    args = append(args, limit)
+	query += " ORDER BY m.created_at DESC LIMIT ?"
+	args = append(args, limit)
 
-    rows, err := db.c.Query(query, args...)
-    if err != nil { return nil, err }
-    defer rows.Close()
+	rows, err := db.c.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    msgs := []models.Message{}
-    const layoutSQLite = "2006-01-02 15:04:05"
+	msgs := []models.Message{}
+	const layoutSQLite = "2006-01-02 15:04:05"
 
-    for rows.Next() {
-        var m models.Message
-        var senderPhoto, txt, photo, replyToID sql.NullString
-        var createdAtStr, status string
-        var rText, rPhoto, rSenderName sql.NullString
+	for rows.Next() {
+		var m models.Message
+		var senderPhoto, txt, photo, replyToID sql.NullString
+		var createdAtStr, status string
+		var rText, rPhoto, rSenderName sql.NullString
 
-        err = rows.Scan(
-            &m.ID, &m.Sender.ID, &m.Sender.Name, &senderPhoto, &m.ConversationID,
-            &txt, &photo, &replyToID, &createdAtStr, &status,
-            &rText, &rPhoto, &rSenderName,
-        )
-        if err != nil { return nil, err }
+		err = rows.Scan(
+			&m.ID, &m.Sender.ID, &m.Sender.Name, &senderPhoto, &m.ConversationID,
+			&txt, &photo, &replyToID, &createdAtStr, &status,
+			&rText, &rPhoto, &rSenderName,
+		)
+		if err != nil {
+			return nil, err
+		}
 
-        if senderPhoto.Valid { m.Sender.Photo = senderPhoto.String }
-        if txt.Valid { m.Text = txt.String }
-        if photo.Valid { m.Photo = photo.String }
-        m.Status = status 
+		if senderPhoto.Valid {
+			m.Sender.Photo = senderPhoto.String
+		}
+		if txt.Valid {
+			m.Text = txt.String
+		}
+		if photo.Valid {
+			m.Photo = photo.String
+		}
+		m.Status = status
 
-        t, err := time.Parse(layoutSQLite, createdAtStr)
-        if err != nil { t, _ = time.Parse(time.RFC3339, createdAtStr) }
-        m.CreatedAt = t
+		t, err := time.Parse(layoutSQLite, createdAtStr)
+		if err != nil {
+			t, _ = time.Parse(time.RFC3339, createdAtStr)
+		}
+		m.CreatedAt = t
 
-        if replyToID.Valid && replyToID.String != "" {
-            m.ReplyToMessageID = replyToID.String
-            m.ReplyTo = &models.Message{
-                ID:    replyToID.String,
-                Text:  rText.String,
-                Photo: rPhoto.String,
-                Sender: models.User{ Name: rSenderName.String },
-            }
-        }
+		if replyToID.Valid && replyToID.String != "" {
+			m.ReplyToMessageID = replyToID.String
+			m.ReplyTo = &models.Message{
+				ID:     replyToID.String,
+				Text:   rText.String,
+				Photo:  rPhoto.String,
+				Sender: models.User{Name: rSenderName.String},
+			}
+		}
 
-        reactions, _ := db.GetReactions(m.ID)
-        
-        if reactions == nil {
-            m.Reactions = []models.Reaction{} 
-        } else {
-            m.Reactions = reactions
-        }
+		reactions, err := db.GetReactions(m.ID)
+		if err != nil {
+			return nil, err
+		}
 
-        msgs = append(msgs, m)
-    }
+		if reactions == nil {
+			m.Reactions = []models.Reaction{}
+		} else {
+			m.Reactions = reactions
+		}
 
-    if msgs == nil { msgs = []models.Message{} }
-    return msgs, nil
+		msgs = append(msgs, m)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if msgs == nil {
+		msgs = []models.Message{}
+	}
+	return msgs, nil
 }
+
 func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
 	rows, err := db.c.Query(`
-		SELECT 
-			r.id, 
-			r.user_id, 
-			u.name, 
-			u.photo, -- Esto puede ser NULL
-			r.emoji, 
-			r.created_at
-		FROM reactions r
-		JOIN users u ON u.id = r.user_id
-		WHERE r.message_id = ?
-		ORDER BY r.created_at ASC
-	`, messageID)
+        SELECT 
+            r.id, 
+            r.user_id, 
+            u.name, 
+            u.photo,
+            r.emoji, 
+            r.created_at
+        FROM reactions r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.message_id = ?
+        ORDER BY r.created_at ASC
+    `, messageID)
 
 	if err != nil {
 		return nil, err
@@ -128,7 +150,7 @@ func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
 	for rows.Next() {
 		var r models.Reaction
 		var createdAtStr string
-		
+
 		var userPhoto sql.NullString
 
 		err = rows.Scan(
@@ -154,6 +176,9 @@ func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
 
 		reactions = append(reactions, r)
 	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
 
 	if reactions == nil {
 		reactions = []models.Reaction{}
@@ -162,46 +187,25 @@ func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
 	return reactions, nil
 }
 
-func (db *appdbimpl) applySeenStatus(
-    convID string,
-    requestingUser string,
-    convType string,
-    msgs []models.Message,
-) {
-    for i := range msgs {
-        msg := &msgs[i]
-
-        if msg.Sender.ID != requestingUser {
-            continue
-        }
-
-        if convType == "private" {
-            db.applyPrivateStatus(convID, msg)
-        } else {
-            db.applyGroupStatus(convID, msg)
-        }
-    }
-}
 func (db *appdbimpl) applyPrivateStatus(convID string, msg *models.Message) {
-
-    var lastSeen time.Time
-    err := db.c.QueryRow(`
+	var lastSeen time.Time
+	err := db.c.QueryRow(`
         SELECT last_seen_message_at
         FROM conversation_user_meta
         WHERE conversation_id = ?
         AND user_id != ?
     `, convID, msg.Sender.ID).Scan(&lastSeen)
 
-    if err == nil && !lastSeen.IsZero() && lastSeen.After(msg.CreatedAt) {
-        msg.Status = "read"
-    } else {
-        msg.Status = "delivered"
-    }
+	if err == nil && !lastSeen.IsZero() && lastSeen.After(msg.CreatedAt) {
+		msg.Status = "read"
+	} else {
+		msg.Status = "delivered"
+	}
 }
-func (db *appdbimpl) applyGroupStatus(convID string, msg *models.Message) {
 
-    var pending int
-    err := db.c.QueryRow(`
+func (db *appdbimpl) applyGroupStatus(convID string, msg *models.Message) {
+	var pending int
+	err := db.c.QueryRow(`
         SELECT COUNT(*)
         FROM conversation_user_meta
         WHERE conversation_id = ?
@@ -209,9 +213,9 @@ func (db *appdbimpl) applyGroupStatus(convID string, msg *models.Message) {
         AND (last_seen_message_at IS NULL OR last_seen_message_at < ?)
     `, convID, msg.Sender.ID, msg.CreatedAt).Scan(&pending)
 
-    if err == nil && pending == 0 {
-        msg.Status = "read"
-    } else {
-        msg.Status = "delivered"
-    }
+	if err == nil && pending == 0 {
+		msg.Status = "read"
+	} else {
+		msg.Status = "delivered"
+	}
 }

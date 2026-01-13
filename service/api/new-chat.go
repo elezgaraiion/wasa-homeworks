@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/aritz/wasa-homeworks/service/api/reqcontext" 
+	"github.com/aritz/wasa-homeworks/service/api/reqcontext"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -12,7 +12,7 @@ func (rt *_router) listOrSearchUsers(w http.ResponseWriter, r *http.Request, _ h
 	userHeader := r.Header.Get("Authorization")
 	userID := extractBearer(userHeader)
 	if userID == "" {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		rt.jsonError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
@@ -20,17 +20,22 @@ func (rt *_router) listOrSearchUsers(w http.ResponseWriter, r *http.Request, _ h
 	users, err := rt.db.ListUsers(q, userID)
 	if err != nil {
 		ctx.Logger.WithError(err).Error("ListUsers DB error")
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		rt.jsonError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
-	json.NewEncoder(w).Encode(users)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(users); err != nil {
+		ctx.Logger.WithError(err).Error("JSON encode failed")
+	}
 }
 
 func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
 	userHeader := r.Header.Get("Authorization")
 	userID := extractBearer(userHeader)
 	if userID == "" {
-		http.Error(w, "Unauthorized", 401)
+		rt.jsonError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
@@ -41,21 +46,24 @@ func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, _ httprou
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		ctx.Logger.WithError(err).Error("Invalid JSON in createGroup")
-		http.Error(w, "Invalid JSON", 400)
+		rt.jsonError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 	if len(body.Name) == 0 {
-		http.Error(w, "Group name required", 400)
+		rt.jsonError(w, http.StatusBadRequest, "Group name required")
 		return
 	}
 
 	conv, err := rt.db.CreateGroup(userID, body.Name, body.Users)
 	if err != nil {
 		ctx.Logger.WithError(err).Error("CreateGroup DB error")
-		http.Error(w, "Internal Server Error", 500)
+		rt.jsonError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 
-	w.WriteHeader(201)
-	json.NewEncoder(w).Encode(conv)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(conv); err != nil {
+		ctx.Logger.WithError(err).Error("JSON encode failed")
+	}
 }

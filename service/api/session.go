@@ -6,8 +6,7 @@ import (
 
 	"github.com/aritz/wasa-homeworks/service/api/reqcontext"
 	"github.com/aritz/wasa-homeworks/service/models"
-
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -15,20 +14,29 @@ func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.
 	var req struct {
 		Name string `json:"name"`
 	}
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil || len(req.Name) < 3 || len(req.Name) > 16 {
-		http.Error(w, "invalid name", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Name) < 3 || len(req.Name) > 16 {
+		rt.jsonError(w, http.StatusBadRequest, "invalid name (must be 3-16 chars)")
 		return
 	}
 
 	id, err := rt.db.GetUserIdByName(req.Name)
 	if err == nil {
-		json.NewEncoder(w).Encode(map[string]string{"identifier": id})
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]string{"identifier": id}); err != nil {
+			ctx.Logger.WithError(err).Error("JSON encode failed")
+		}
+		return
+	}
+
+	newUUID, err := uuid.NewV4()
+	if err != nil {
+		ctx.Logger.WithError(err).Error("UUID generation failed")
+		rt.jsonError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
 	newUser := models.User{
-		ID:    uuid.New().String(),
+		ID:    newUUID.String(),
 		Name:  req.Name,
 		Photo: "",
 	}
@@ -36,28 +44,33 @@ func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, _ httprouter.
 	err = rt.db.CreateUser(newUser)
 	if err != nil {
 		ctx.Logger.WithError(err).Error("cannot create user")
-		http.Error(w, "cannot create user", http.StatusInternalServerError)
+		rt.jsonError(w, http.StatusInternalServerError, "cannot create user")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"identifier": newUser.ID})
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{"identifier": newUser.ID}); err != nil {
+		ctx.Logger.WithError(err).Error("JSON encode failed")
+	}
 }
 
 func (rt *_router) getMyConversations(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
 	userHeader := r.Header.Get("Authorization")
 	userID := extractBearer(userHeader)
 	if userID == "" {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		rt.jsonError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	convs, err := rt.db.GetMyConversations(userID)
 	if err != nil {
 		ctx.Logger.WithError(err).Error("GetMyConversations failed")
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		rt.jsonError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(convs)
+	if err := json.NewEncoder(w).Encode(convs); err != nil {
+		ctx.Logger.WithError(err).Error("JSON encode failed")
+	}
 }

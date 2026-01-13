@@ -5,13 +5,11 @@
 # docker run -it -p 3000:3000 --rm aritz-backend:latest 
 
 FROM golang:1.19.4 as backend_compiler
-RUN mkdir /Executable/
-WORKDIR /GoFiles/
+WORKDIR /src/
 COPY . .
-RUN go build -o /Executable/ ./cmd/webapi
-
+RUN go build -o /app/webapi/ ./cmd/webapi
 FROM debian:stable
-WORKDIR /executable_backend/
-COPY --from=backend_compiler /Executable/ .
+WORKDIR /app/
+COPY --from=backend_compiler /app/webapi ./
 EXPOSE 3000
-CMD ["./webapi"]
+CMD ["/app/webapi"]

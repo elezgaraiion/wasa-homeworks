@@ -803,8 +803,10 @@ paths:
                   description: Identifier of the message being replied to. It will create a snapshot of the content.
                   example: "msg000"
               anyOf:
-                - required: ["text"]
-                - required: ["photo"]
+                - type: object
+                  required: ["text"]
+                - type: object
+                  required: ["photo"]
       responses:
         '201':
           description: Message sent successfully.

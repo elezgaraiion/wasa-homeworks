@@ -3,7 +3,7 @@ package database
 import (
 	"database/sql"
 	"errors"
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/aritz/wasa-homeworks/service/models"
@@ -68,7 +68,8 @@ func (db *appdbimpl) ForwardMessage(userID, sourceConvID, messageID, targetConvI
         VALUES (?, ?, ?, ?, ?, ?, 'delivered')
     `, newMessageID, userID, targetConvID, text, photo, nowStr)
 	if err != nil {
-		return models.Message{}, fmt.Errorf("insert msg: %w", err)
+		log.Printf("insert msg error: %v", err)
+		return models.Message{}, err
 	}
 
 	preview := ""
@@ -85,7 +86,8 @@ func (db *appdbimpl) ForwardMessage(userID, sourceConvID, messageID, targetConvI
         WHERE id = ?
     `, preview, nowStr, targetConvID)
 	if err != nil {
-		return models.Message{}, fmt.Errorf("update conv: %w", err)
+		log.Printf("update conv error: %v", err)
+		return models.Message{}, err
 	}
 
 	res, err := tx.Exec(`

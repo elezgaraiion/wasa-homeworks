@@ -10,7 +10,7 @@ func applyCORSHandler(h http.Handler) http.Handler {
 		handlers.AllowedHeaders([]string{
 			"Content-Type",
 		}),
-		handlers.AllowedHeaders([]string{"x-example-header","Authorization"}),
+		handlers.AllowedHeaders([]string{"x-example-header", "Authorization"}),
 		handlers.AllowedMethods([]string{"GET", "POST", "OPTIONS", "DELETE", "PUT"}),
 		handlers.AllowedOrigins([]string{"*"}),
 		handlers.MaxAge(1),

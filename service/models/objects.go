@@ -3,9 +3,9 @@ package models
 import "time"
 
 type User struct {
-    ID    string `db:"id" json:"id"`             
-    Name  string `db:"name" json:"name"`           
-    Photo string `db:"photo,omitempty" json:"photo,omitempty"` 
+	ID    string `db:"id" json:"id"`
+	Name  string `db:"name" json:"name"`
+	Photo string `db:"photo,omitempty" json:"photo,omitempty"`
 }
 
 type Conversation struct {
@@ -15,36 +15,36 @@ type Conversation struct {
 	Photo              string    `db:"photo,omitempty" json:"photo,omitempty"`
 	LastMessagePreview string    `db:"last_message_preview,omitempty" json:"lastMessagePreview,omitempty"`
 	LastMessageAt      time.Time `db:"last_message_at,omitempty" json:"lastMessageAt,omitempty"`
-	
-	LastMessageSenderID string `json:"lastMessageSenderId"` 
-	LastMessageStatus   string `json:"lastMessageStatus"`   
-	LastMessageSenderName string `json:"lastMessageSenderName"` 
-	
-    UnreadCount int `json:"unreadCount"`
-    
+
+	LastMessageSenderID   string `json:"lastMessageSenderId"`
+	LastMessageStatus     string `json:"lastMessageStatus"`
+	LastMessageSenderName string `json:"lastMessageSenderName"`
+
+	UnreadCount int `json:"unreadCount"`
+
 	Participants []User    `db:"participants" json:"participants"`
 	TempOrderAt  time.Time `json:"-"`
 }
 
 type Reaction struct {
-    ID        string    `db:"id" json:"id"`         
-    User      User      `db:"user" json:"user"`       
-    Emoji     string    `db:"emoji" json:"emoji"`      
-    CreatedAt time.Time `db:"created_at" json:"createdAt"` 
+	ID        string    `db:"id" json:"id"`
+	User      User      `db:"user" json:"user"`
+	Emoji     string    `db:"emoji" json:"emoji"`
+	CreatedAt time.Time `db:"created_at" json:"createdAt"`
 }
 
 type Message struct {
-    ID               string     `db:"id" json:"id"`                 
-    Sender           User       `db:"sender" json:"sender"`             
-    ConversationID   string     `db:"conversation_id" json:"conversationId"`    
-    Text             string     `db:"text,omitempty" json:"text,omitempty"`     
-    Photo            string     `db:"photo,omitempty" json:"photo,omitempty"`    
-    ReplyToMessageID string     `db:"reply_to_message_id,omitempty" json:"replyToMessageId,omitempty"`
-    ReplySnapshotText   string `db:"reply_snapshot_text,omitempty" json:"-"` 
-    ReplySnapshotSender string `db:"reply_snapshot_sender,omitempty" json:"-"`
-    ReplySnapshotPhoto  string `db:"reply_snapshot_photo,omitempty" json:"-"`
-    CreatedAt        time.Time  `db:"created_at" json:"createdAt"`         
-    Reactions        []Reaction `db:"reactions,omitempty" json:"reactions,omitempty"`
-    Status           string     `db:"status" json:"status"` 
-	ReplyTo          *Message `json:"replyTo,omitempty"`            
+	ID                  string     `db:"id" json:"id"`
+	Sender              User       `db:"sender" json:"sender"`
+	ConversationID      string     `db:"conversation_id" json:"conversationId"`
+	Text                string     `db:"text,omitempty" json:"text,omitempty"`
+	Photo               string     `db:"photo,omitempty" json:"photo,omitempty"`
+	ReplyToMessageID    string     `db:"reply_to_message_id,omitempty" json:"replyToMessageId,omitempty"`
+	ReplySnapshotText   string     `db:"reply_snapshot_text,omitempty" json:"-"`
+	ReplySnapshotSender string     `db:"reply_snapshot_sender,omitempty" json:"-"`
+	ReplySnapshotPhoto  string     `db:"reply_snapshot_photo,omitempty" json:"-"`
+	CreatedAt           time.Time  `db:"created_at" json:"createdAt"`
+	Reactions           []Reaction `db:"reactions,omitempty" json:"reactions,omitempty"`
+	Status              string     `db:"status" json:"status"`
+	ReplyTo             *Message   `json:"replyTo,omitempty"`
 }

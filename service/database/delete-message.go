@@ -3,7 +3,7 @@ package database
 import (
 	"database/sql"
 	"errors"
-	"fmt"
+	"log"
 
 	"github.com/aritz/wasa-homeworks/service/models"
 )
@@ -49,7 +49,8 @@ func (db *appdbimpl) DeleteMessage(userID, convID, messageID string) error {
 
 	_, err = tx.Exec(`DELETE FROM reactions WHERE message_id = ?`, messageID)
 	if err != nil {
-		return fmt.Errorf("error cleaning reactions: %w", err)
+		log.Printf("error cleaning reactions: %v", err)
+		return err
 	}
 
 	res, err := tx.Exec(`
@@ -57,7 +58,8 @@ func (db *appdbimpl) DeleteMessage(userID, convID, messageID string) error {
         WHERE id = ? AND conversation_id = ?
     `, messageID, convID)
 	if err != nil {
-		return fmt.Errorf("delete message sql error: %w", err)
+		log.Printf("delete message sql error: %v", err)
+		return err
 	}
 
 	affected, err := res.RowsAffected()
@@ -86,7 +88,8 @@ func (db *appdbimpl) DeleteMessage(userID, convID, messageID string) error {
             WHERE id = ?
         `, msgCreatedAt, convID)
 		if err != nil {
-			return fmt.Errorf("update empty conv: %w", err)
+			log.Printf("update empty conv: %v", err)
+			return err
 		}
 	} else if err != nil {
 		return err
@@ -108,7 +111,8 @@ func (db *appdbimpl) DeleteMessage(userID, convID, messageID string) error {
         `, preview, newCreatedAt, convID)
 
 		if err != nil {
-			return fmt.Errorf("update conv preview: %w", err)
+			log.Printf("update conv preview: %v", err)
+			return err
 		}
 	}
 

@@ -1,9 +1,8 @@
 package database
 
 import (
-	"time"
-
 	"github.com/aritz/wasa-homeworks/service/models"
+	"time"
 )
 
 func (db *appdbimpl) MarkConversationSeen(userID, convID string) error {

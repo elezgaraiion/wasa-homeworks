@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/aritz/wasa-homeworks/service/models"
 )
@@ -20,7 +19,7 @@ func (db *appdbimpl) SetGroupPhoto(userID, convID, photoURL string) (models.Conv
 		return models.Conversation{}, err
 	}
 	if convType != "group" {
-		return models.Conversation{}, fmt.Errorf("cannot set photo for private conversation")
+		return models.Conversation{}, errors.New("cannot set photo for private conversation")
 	}
 
 	var exists int

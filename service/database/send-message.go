@@ -2,7 +2,7 @@ package database
 
 import (
 	"database/sql"
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/aritz/wasa-homeworks/service/models"
@@ -72,7 +72,8 @@ func (db *appdbimpl) SendMessage(userID string, conversationID string, text stri
     `, msgID, conversationID, userID, text, sqlPhoto, nowStr, sqlReplyID, snapText, snapSender, snapPhoto)
 
 	if err != nil {
-		return models.Message{}, fmt.Errorf("insert msg: %w", err)
+		log.Printf("insert msg error: %v", err)
+		return models.Message{}, err
 	}
 
 	preview := text
@@ -85,7 +86,8 @@ func (db *appdbimpl) SendMessage(userID string, conversationID string, text stri
         WHERE id = ?
     `, preview, nowStr, conversationID)
 	if err != nil {
-		return models.Message{}, fmt.Errorf("update conv: %w", err)
+		log.Printf("update conv error: %v", err)
+		return models.Message{}, err
 	}
 
 	_, err = tx.Exec(`
@@ -95,7 +97,8 @@ func (db *appdbimpl) SendMessage(userID string, conversationID string, text stri
         DO UPDATE SET last_seen_message_at = excluded.last_seen_message_at
     `, conversationID, userID, nowStr, nowStr)
 	if err != nil {
-		return models.Message{}, fmt.Errorf("update meta: %w", err)
+		log.Printf("update meta error: %v", err)
+		return models.Message{}, err
 	}
 
 	if err := tx.Commit(); err != nil {

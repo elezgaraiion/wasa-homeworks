@@ -1,21 +1,22 @@
 package main
+
 import (
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	"math/rand"
-	"strings"
-	"net/http"
 	"github.com/ardanlabs/conf"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/sirupsen/logrus"
 	"github.com/aritz/wasa-homeworks/service/api"
 	"github.com/aritz/wasa-homeworks/service/database"
 	"github.com/aritz/wasa-homeworks/service/globaltime"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/sirupsen/logrus"
+	"math/rand"
+	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 )
 
 func main() {
@@ -26,122 +27,122 @@ func main() {
 }
 
 func run() error {
-    rand.Seed(globaltime.Now().UnixNano())
+	rand.Seed(globaltime.Now().UnixNano())
 
-    cfg, err := loadConfiguration()
-    if err != nil {
-        if errors.Is(err, conf.ErrHelpWanted) {
-            return nil
-        }
-        return err
-    }
-    logger := logrus.New()
-    logger.SetOutput(os.Stdout)
-    if cfg.Debug {
-        logger.SetLevel(logrus.DebugLevel)
-    } else {
-        logger.SetLevel(logrus.InfoLevel)
-    }
-    logger.Infof("application initializing")
+	cfg, err := loadConfiguration()
+	if err != nil {
+		if errors.Is(err, conf.ErrHelpWanted) {
+			return nil
+		}
+		return err
+	}
+	logger := logrus.New()
+	logger.SetOutput(os.Stdout)
+	if cfg.Debug {
+		logger.SetLevel(logrus.DebugLevel)
+	} else {
+		logger.SetLevel(logrus.InfoLevel)
+	}
+	logger.Infof("application initializing")
 
-    if err := os.MkdirAll("./uploads", 0755); err != nil {
-        return fmt.Errorf("error creating uploads directory: %w", err)
-    }
-    logger.Info("uploads directory ready")
+	if err := os.MkdirAll("./uploads", 0755); err != nil {
+		return fmt.Errorf("error creating uploads directory: %w", err)
+	}
+	logger.Info("uploads directory ready")
 
-    logger.Println("initializing database support")
-    dbconn, err := sql.Open("sqlite3", cfg.DB.Filename)
-    if err != nil {
-        logger.WithError(err).Error("error opening SQLite DB")
-        return fmt.Errorf("opening SQLite: %w", err)
-    }
-    defer func() {
-        logger.Debug("database stopping")
-        _ = dbconn.Close()
-    }()
-    db, err := database.New(dbconn)
-    if err != nil {
-        logger.WithError(err).Error("error creating AppDatabase")
-        return fmt.Errorf("creating AppDatabase: %w", err)
-    }
+	logger.Println("initializing database support")
+	dbconn, err := sql.Open("sqlite3", cfg.DB.Filename)
+	if err != nil {
+		logger.WithError(err).Error("error opening SQLite DB")
+		return fmt.Errorf("opening SQLite: %w", err)
+	}
+	defer func() {
+		logger.Debug("database stopping")
+		_ = dbconn.Close()
+	}()
+	db, err := database.New(dbconn)
+	if err != nil {
+		logger.WithError(err).Error("error creating AppDatabase")
+		return fmt.Errorf("creating AppDatabase: %w", err)
+	}
 
-    logger.Info("initializing API server")
-    shutdown := make(chan os.Signal, 1)
-    signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
-    serverErrors := make(chan error, 1)
+	logger.Info("initializing API server")
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+	serverErrors := make(chan error, 1)
 
-    apirouter, err := api.New(api.Config{
-        Logger:   logger,
-        Database: db,
-    })
-    if err != nil {
-        logger.WithError(err).Error("error creating the API server instance")
-        return fmt.Errorf("creating the API server instance: %w", err)
-    }
-    
-    router := apirouter.Handler()
+	apirouter, err := api.New(api.Config{
+		Logger:   logger,
+		Database: db,
+	})
+	if err != nil {
+		logger.WithError(err).Error("error creating the API server instance")
+		return fmt.Errorf("creating the API server instance: %w", err)
+	}
 
-    fileServer := http.FileServer(http.Dir("./uploads"))
-    
-    nextHandler := router
-    router = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        if strings.HasPrefix(r.URL.Path, "/uploads/") {
-            http.StripPrefix("/uploads/", fileServer).ServeHTTP(w, r)
-            return
-        }
-        nextHandler.ServeHTTP(w, r)
-    })
+	router := apirouter.Handler()
 
-    router, err = registerWebUI(router)
-    if err != nil {
-        logger.WithError(err).Error("error registering web UI handler")
-        return fmt.Errorf("registering web UI handler: %w", err)
-    }
+	fileServer := http.FileServer(http.Dir("./uploads"))
 
-    router = applyCORSHandler(router)
+	nextHandler := router
+	router = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/uploads/") {
+			http.StripPrefix("/uploads/", fileServer).ServeHTTP(w, r)
+			return
+		}
+		nextHandler.ServeHTTP(w, r)
+	})
 
-    apiserver := http.Server{
-        Addr:              cfg.Web.APIHost,
-        Handler:           router,
-        ReadTimeout:       cfg.Web.ReadTimeout,
-        ReadHeaderTimeout: cfg.Web.ReadTimeout,
-        WriteTimeout:      cfg.Web.WriteTimeout,
-    }
+	router, err = registerWebUI(router)
+	if err != nil {
+		logger.WithError(err).Error("error registering web UI handler")
+		return fmt.Errorf("registering web UI handler: %w", err)
+	}
 
-    go func() {
-        logger.Infof("API listening on %s", apiserver.Addr)
-        serverErrors <- apiserver.ListenAndServe()
-        logger.Infof("stopping API server")
-    }()
+	router = applyCORSHandler(router)
 
-    select {
-    case err := <-serverErrors:
-        return fmt.Errorf("server error: %w", err)
+	apiserver := http.Server{
+		Addr:              cfg.Web.APIHost,
+		Handler:           router,
+		ReadTimeout:       cfg.Web.ReadTimeout,
+		ReadHeaderTimeout: cfg.Web.ReadTimeout,
+		WriteTimeout:      cfg.Web.WriteTimeout,
+	}
 
-    case sig := <-shutdown:
-        logger.Infof("signal %v received, start shutdown", sig)
+	go func() {
+		logger.Infof("API listening on %s", apiserver.Addr)
+		serverErrors <- apiserver.ListenAndServe()
+		logger.Infof("stopping API server")
+	}()
 
-        err := apirouter.Close()
-        if err != nil {
-            logger.WithError(err).Warning("graceful shutdown of apirouter error")
-        }
+	select {
+	case err := <-serverErrors:
+		return fmt.Errorf("server error: %w", err)
 
-        ctx, cancel := context.WithTimeout(context.Background(), cfg.Web.ShutdownTimeout)
-        defer cancel()
+	case sig := <-shutdown:
+		logger.Infof("signal %v received, start shutdown", sig)
 
-        err = apiserver.Shutdown(ctx)
-        if err != nil {
-            logger.WithError(err).Warning("error during graceful shutdown of HTTP server")
-            err = apiserver.Close()
-        }
+		err := apirouter.Close()
+		if err != nil {
+			logger.WithError(err).Warning("graceful shutdown of apirouter error")
+		}
 
-        switch {
-        case sig == syscall.SIGSTOP:
-            return errors.New("integrity issue caused shutdown")
-        case err != nil:
-            return fmt.Errorf("could not stop server gracefully: %w", err)
-        }
-    }
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Web.ShutdownTimeout)
+		defer cancel()
 
-    return nil
+		err = apiserver.Shutdown(ctx)
+		if err != nil {
+			logger.WithError(err).Warning("error during graceful shutdown of HTTP server")
+			err = apiserver.Close()
+		}
+
+		switch {
+		case sig == syscall.SIGSTOP:
+			return errors.New("integrity issue caused shutdown")
+		case err != nil:
+			return fmt.Errorf("could not stop server gracefully: %w", err)
+		}
+	}
+
+	return nil
 }

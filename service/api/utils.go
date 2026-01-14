@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	
+
 	"crypto/rand"
 	"encoding/hex"
 	"io"
@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	
 )
 
 func saveImageFile(file multipart.File, handle *multipart.FileHeader) (string, error) {

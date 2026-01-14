@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/aritz/wasa-homeworks/service/models"
 )
@@ -20,7 +19,7 @@ func (db *appdbimpl) SetGroupName(userID, convID, newName string) (models.Conver
 		return models.Conversation{}, err
 	}
 	if convType != "group" {
-		return models.Conversation{}, fmt.Errorf("cannot rename private conversation")
+		return models.Conversation{}, errors.New("cannot rename private conversation")
 	}
 
 	var exists int

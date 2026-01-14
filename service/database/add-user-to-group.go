@@ -3,7 +3,7 @@ package database
 import (
 	"database/sql"
 	"errors"
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/aritz/wasa-homeworks/service/models"
@@ -19,7 +19,7 @@ func (db *appdbimpl) AddUserToGroup(requestUserID, convID, targetUserID string) 
 		return models.Conversation{}, err
 	}
 	if convType != "group" {
-		return models.Conversation{}, fmt.Errorf("cannot add users to private conversations")
+		return models.Conversation{}, errors.New("cannot add users to private conversations")
 	}
 
 	var exists int
@@ -67,19 +67,22 @@ func (db *appdbimpl) AddUserToGroup(requestUserID, convID, targetUserID string) 
 		targetName = "User"
 	}
 
-	systemText := fmt.Sprintf("SYS:added %s to the group", targetName)
+	systemText := "SYS:added " + targetName + " to the group"
 
 	msgTime := now.Add(time.Millisecond)
 	err = db.createSystemMessage(tx, convID, requestUserID, systemText, msgTime.Format(time.RFC3339Nano))
 	if err != nil {
-		return models.Conversation{}, fmt.Errorf("error creating system message: %w", err)
+		log.Printf("Error creating system message: %v", err)
+		return models.Conversation{}, err
 	}
+
+	previewText := "added " + targetName + " to the group"
 
 	_, err = tx.Exec(`
         UPDATE conversations 
         SET last_message_preview = ?, last_message_at = ?
         WHERE id = ?
-    `, fmt.Sprintf("added %s to the group", targetName), msgTime.Format(time.RFC3339Nano), convID)
+    `, previewText, msgTime.Format(time.RFC3339Nano), convID)
 	if err != nil {
 		return models.Conversation{}, err
 	}

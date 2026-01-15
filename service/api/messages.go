@@ -10,8 +10,6 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-
-
 func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	userHeader := r.Header.Get("Authorization")
 	userID := extractBearer(userHeader)
@@ -66,7 +64,6 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
 		ctx.Logger.WithError(err).Error("JSON encode failed")
 	}
 }
-
 
 func (rt *_router) addReactionToMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	userHeader := r.Header.Get("Authorization")

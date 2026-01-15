@@ -44,6 +44,19 @@
         </p>
       </div>
 
+      <div v-if="isGroup && participantsList.length > 0" class="members-section">
+        <h3 class="section-title">Members</h3>
+        <div class="user-list-static">
+            <div v-for="member in participantsList" :key="member.id || member.user_id" class="user-row">
+                <img 
+                  :src="resolveUrl(member.photo) || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png'" 
+                  class="user-avatar-small" 
+                  @error="handleImgError"
+                />
+                <span class="user-name">{{ member.name }}</span>
+                </div>
+        </div>
+      </div>
       <hr class="divider" />
 
       <div v-if="isGroup" class="add-section">
@@ -91,22 +104,56 @@ export default {
       isEditingName: false,
       newName: '',
       searchQuery: '',
-      searchResults: []
+      searchResults: [],
+      loadingDetails: false // Para evitar parpadeos o errores
     };
   },
   watch: {
+    // Observamos cambios en el objeto 'chat' o el ID
     chat: {
       immediate: true,
       handler(newChat) {
         if (newChat) {
+          // 1. Carga INICIAL con lo que ya tenemos (para que no salga vacío)
           this.localChat = { ...newChat };
           this.isGroup = newChat.type === 'group';
+          // Si por suerte vienen participantes en las props, los usamos temporalmente
           this.participantsList = [...(newChat.participants || [])];
+          
+          // 2. LLAMADA AL BACKEND para obtener la info real y completa (SQL optimizado)
+          this.loadFullDetails();
         }
       }
     }
   },
   methods: {
+    // --- ESTA ES LA FUNCIÓN NUEVA QUE CONECTA CON TU BACKEND ---
+    async loadFullDetails() {
+      if (!this.chatId) return;
+      this.loadingDetails = true;
+      try {
+        // Llamamos al endpoint: GET /conversations/{id}
+        const res = await this.$axios.get(`/conversations/${this.chatId}`);
+        const fullData = res.data;
+
+        // Actualizamos los datos locales con la respuesta "fresca" de la base de datos
+        this.localChat.name = fullData.name;
+        this.localChat.photo = fullData.photo;
+        this.localChat.type = fullData.type;
+        
+        // Aquí es donde obtienes la lista de participantes que faltaba
+        this.participantsList = fullData.participants || [];
+        
+        // Si la lógica de "Direct" cambió algo (ej. nombre del otro usuario), actualizamos:
+        this.isGroup = fullData.type === 'group';
+
+      } catch (e) {
+        console.error("Error cargando detalles del chat:", e);
+      } finally {
+        this.loadingDetails = false;
+      }
+    },
+
     resolveUrl(path) {
         if (!path) return '';
         if (path.startsWith('http')) return path;
@@ -140,6 +187,7 @@ export default {
             userId: user.id 
         });
         
+        // Agregamos visualmente al usuario a la lista sin recargar todo
         this.participantsList.push(user);
         this.searchQuery = '';
         this.searchResults = [];
@@ -179,6 +227,7 @@ export default {
         formData.append('photoFile', file);
         const response = await this.$axios.put(`/conversations/${this.chatId}/photo`, formData);
         const updated = response.data;
+        // Truco para evitar caché del navegador al cambiar foto
         const newPhotoUrl = updated.photo + '?t=' + new Date().getTime();
         this.localChat.photo = newPhotoUrl;
         

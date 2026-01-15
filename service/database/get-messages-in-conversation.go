@@ -125,6 +125,68 @@ func (db *appdbimpl) GetMessagesInConversation(
 	return msgs, nil
 }
 
+func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
+	rows, err := db.c.Query(`
+        SELECT 
+            r.id, 
+            r.user_id, 
+            u.name, 
+            u.photo,
+            r.emoji, 
+            r.created_at
+        FROM reactions r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.message_id = ?
+        ORDER BY r.created_at ASC
+    `, messageID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reactions []models.Reaction
+
+	for rows.Next() {
+		var r models.Reaction
+		var createdAtStr string
+
+		var userPhoto sql.NullString
+
+		err = rows.Scan(
+			&r.ID,
+			&r.User.ID,
+			&r.User.Name,
+			&userPhoto,
+			&r.Emoji,
+			&createdAtStr,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if userPhoto.Valid {
+			r.User.Photo = userPhoto.String
+		}
+
+		t, err := time.Parse(time.RFC3339, createdAtStr)
+		if err == nil {
+			r.CreatedAt = t
+		}
+
+		reactions = append(reactions, r)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if reactions == nil {
+		reactions = []models.Reaction{}
+	}
+
+	return reactions, nil
+}
+
 func (db *appdbimpl) applyPrivateStatus(convID string, msg *models.Message) {
 	var lastSeen time.Time
 	err := db.c.QueryRow(`

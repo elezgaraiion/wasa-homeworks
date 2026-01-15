@@ -29,11 +29,9 @@ type AppDatabase interface {
 
 	GetMessagesInConversation(userID string, convID string, limit int, before string) ([]models.Message, error)
 	SendMessage(userID string, conversationID string, text string, photoURL string, replyToMessageID string) (models.Message, error)
-	GetMessageByID(userID, convID, messageID string) (models.Message, error)
 	ForwardMessage(userID, sourceConvID, messageID, targetConvID string) (models.Message, error)
 	DeleteMessage(userID, convID, messageID string) error
 
-	GetReactions(messageID string) ([]models.Reaction, error)
 	AddReaction(userID, convID, msgID, emoji string) (models.Reaction, error)
 	RemoveReaction(userID, convID, msgID, reactionID string) error
 

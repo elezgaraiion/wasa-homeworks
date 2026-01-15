@@ -10,48 +10,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-func (rt *_router) getMessageById(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	userHeader := r.Header.Get("Authorization")
-	userID := extractBearer(userHeader)
-	if userID == "" {
-		rt.jsonError(w, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 
-	convID := ps.ByName("conversationId")
-	if convID == "" {
-		rt.jsonError(w, http.StatusBadRequest, "Missing conversationId")
-		return
-	}
-
-	messageID := ps.ByName("messageId")
-	if messageID == "" {
-		rt.jsonError(w, http.StatusBadRequest, "Missing messageId")
-		return
-	}
-
-	msg, err := rt.db.GetMessageByID(userID, convID, messageID)
-	if err != nil {
-		switch {
-		case errors.Is(err, models.ErrConversationNotFound):
-			rt.jsonError(w, http.StatusNotFound, "Conversation not found")
-		case errors.Is(err, models.ErrForbidden):
-			rt.jsonError(w, http.StatusForbidden, "Forbidden")
-		case errors.Is(err, models.ErrMessageNotFound):
-			rt.jsonError(w, http.StatusNotFound, "Message not found")
-		default:
-			ctx.Logger.WithError(err).Error("Get message error")
-			rt.jsonError(w, http.StatusInternalServerError, "Internal server error")
-		}
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(msg); err != nil {
-		ctx.Logger.WithError(err).Error("JSON encode failed")
-	}
-}
 
 func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	userHeader := r.Header.Get("Authorization")
@@ -108,50 +67,6 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
 	}
 }
 
-func (rt *_router) listReactionsForMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	userHeader := r.Header.Get("Authorization")
-	userID := extractBearer(userHeader)
-	if userID == "" {
-		rt.jsonError(w, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
-
-	convID := ps.ByName("conversationId")
-	if convID == "" {
-		rt.jsonError(w, http.StatusBadRequest, "Missing conversationId")
-		return
-	}
-
-	messageID := ps.ByName("messageId")
-	if messageID == "" {
-		rt.jsonError(w, http.StatusBadRequest, "Missing messageId")
-		return
-	}
-
-	ok, err := rt.db.IsUserInConversation(userID, convID)
-	if err != nil {
-		ctx.Logger.WithError(err).Error("IsUserInConversation check failed")
-		rt.jsonError(w, http.StatusInternalServerError, "Internal server error")
-		return
-	}
-	if !ok {
-		rt.jsonError(w, http.StatusForbidden, "Forbidden")
-		return
-	}
-
-	reactions, err := rt.db.GetReactions(messageID)
-	if err != nil {
-		ctx.Logger.WithError(err).Error("Get reactions error")
-		rt.jsonError(w, http.StatusInternalServerError, "Internal server error")
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(reactions); err != nil {
-		ctx.Logger.WithError(err).Error("JSON encode failed")
-	}
-}
 
 func (rt *_router) addReactionToMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	userHeader := r.Header.Get("Authorization")

@@ -11,5 +11,7 @@ RUN go build -o /app/webapi/ ./cmd/webapi
 FROM debian:stable
 WORKDIR /app/
 COPY --from=backend_compiler /app/webapi ./
+RUN mkdir -p ./uploads && chmod 777 ./uploads
+RUN mkdir -p ./tmp && chmod 777 ./tmp
 EXPOSE 3000
 CMD ["/app/webapi"]

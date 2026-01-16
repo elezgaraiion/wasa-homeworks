@@ -186,36 +186,3 @@ func (db *appdbimpl) GetReactions(messageID string) ([]models.Reaction, error) {
 
 	return reactions, nil
 }
-
-func (db *appdbimpl) applyPrivateStatus(convID string, msg *models.Message) {
-	var lastSeen time.Time
-	err := db.c.QueryRow(`
-        SELECT last_seen_message_at
-        FROM conversation_user_meta
-        WHERE conversation_id = ?
-        AND user_id != ?
-    `, convID, msg.Sender.ID).Scan(&lastSeen)
-
-	if err == nil && !lastSeen.IsZero() && lastSeen.After(msg.CreatedAt) {
-		msg.Status = "read"
-	} else {
-		msg.Status = "delivered"
-	}
-}
-
-func (db *appdbimpl) applyGroupStatus(convID string, msg *models.Message) {
-	var pending int
-	err := db.c.QueryRow(`
-        SELECT COUNT(*)
-        FROM conversation_user_meta
-        WHERE conversation_id = ?
-        AND user_id != ?
-        AND (last_seen_message_at IS NULL OR last_seen_message_at < ?)
-    `, convID, msg.Sender.ID, msg.CreatedAt).Scan(&pending)
-
-	if err == nil && pending == 0 {
-		msg.Status = "read"
-	} else {
-		msg.Status = "delivered"
-	}
-}

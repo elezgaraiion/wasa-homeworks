@@ -17,6 +17,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"path/filepath"
 )
 
 func main() {
@@ -49,7 +50,10 @@ func run() error {
 		return fmt.Errorf("error creating uploads directory: %w", err)
 	}
 	logger.Info("uploads directory ready")
-
+	dbDir := filepath.Dir(cfg.DB.Filename)
+    if err := os.MkdirAll(dbDir, 0755); err != nil {
+        return fmt.Errorf("error creating database directory: %w", err)
+    }
 	logger.Println("initializing database support")
 	dbconn, err := sql.Open("sqlite3", cfg.DB.Filename)
 	if err != nil {
